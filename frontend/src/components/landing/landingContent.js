@@ -2,7 +2,7 @@ export const faqData = [
   {
     question: "How do I book a salon appointment online?",
     answer:
-      "Create an account, choose a service, select an available date and time, and confirm. You'll see your appointment details right away.",
+      "Create an account, choose a service, select an available date and time, and submit your request. Staff will confirm the appointment before your visit.",
   },
   {
     question: "Can I reschedule or cancel my appointment?",
@@ -12,7 +12,7 @@ export const faqData = [
   {
     question: "Will I get a reminder?",
     answer:
-      "Yes. The system sends notifications for confirmed bookings, cancellations, and upcoming appointments.",
+      "Yes. You'll receive a notification when staff confirms your booking, along with reminders and updates.",
   },
   {
     question: "Can I see the price and duration before booking?",

@@ -83,11 +83,11 @@ function BookingConfirmationPage() {
               <span className="booking-confirmation-mark" aria-hidden="true">
                 ✓
               </span>
-              <p className="booking-eyebrow">Appointment saved</p>
-              <h1 id="confirmation-title">Your appointment is confirmed</h1>
+              <p className="booking-eyebrow">Appointment request received</p>
+              <h1 id="confirmation-title">Your appointment is pending</h1>
               <p className="booking-lede">
-                Keep this reference handy. You can view the appointment details
-                or return to your dashboard.
+                Keep this reference handy. Our staff will review your request
+                and confirm the appointment before your visit.
               </p>
               <BookingSummary
                 service={service}

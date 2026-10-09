@@ -2,7 +2,7 @@ const steps = [
   "Create your account: Register in seconds and manage your profile.",
   "Choose a service: Browse descriptions, prices, and estimated durations.",
   "Pick a date and time: Select from available slots.",
-  "Get confirmed: Receive your appointment details and reminders.",
+  "Await confirmation: Our staff reviews your request and confirms your visit.",
 ];
 
 function HowItWorks() {

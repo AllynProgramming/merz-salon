@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { bookingSchedule } from "../../config/bookingSchedule.js";
-import { formatDate } from "./bookingUtils.js";
+import { formatDate, toDateOnly } from "./bookingUtils.js";
 
 function dateKey(date) {
   const year = date.getFullYear();
@@ -11,7 +11,10 @@ function dateKey(date) {
 
 function DatePicker({ value, onChange, serviceDuration = 30 }) {
   const [viewMonth, setViewMonth] = useState(() => {
-    const selected = value ? new Date(`${value}T00:00:00`) : new Date();
+    const normalizedValue = toDateOnly(value);
+    const selected = normalizedValue
+      ? new Date(`${normalizedValue}T00:00:00`)
+      : new Date();
     return new Date(selected.getFullYear(), selected.getMonth(), 1);
   });
   const [clock] = useState(() => new Date());
@@ -132,7 +135,7 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
           const key = dateKey(day);
           const isCurrentMonth = day.getMonth() === viewMonth.getMonth();
           const isToday = key === dateKey(today);
-          const isSelected = key === value;
+          const isSelected = key === toDateOnly(value);
           return (
             <button
               className={`booking-calendar-day ${isCurrentMonth ? "" : "is-outside"} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}

@@ -8,7 +8,11 @@ import {
   TimeSlotGrid,
   Toast,
 } from "../components/booking/BookingComponents.jsx";
-import { formatDate, formatTime } from "../components/booking/bookingUtils.js";
+import {
+  formatDate,
+  formatTime,
+  toDateOnly,
+} from "../components/booking/bookingUtils.js";
 import useAuth from "../context/useAuth.js";
 import {
   getAppointment,
@@ -39,7 +43,7 @@ function ReschedulePage() {
         if (!active) return;
         const item = result.appointment || result;
         setAppointment(item);
-        setDate(item.date);
+        setDate(toDateOnly(item.date));
         setSlotsLoading(true);
       })
       .catch((requestError) => {

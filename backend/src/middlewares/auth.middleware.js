@@ -32,3 +32,11 @@ export const requireCustomer = (req, res, next) => {
 
   return next();
 };
+
+export const requireStaffOrAdmin = (req, res, next) => {
+  if (!req.user || !["staff", "admin"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Staff access is required" });
+  }
+
+  return next();
+};

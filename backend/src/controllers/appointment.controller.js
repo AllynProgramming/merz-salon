@@ -577,21 +577,23 @@ export const createAppointment = async (req, res, next) => {
       durationMinutes: Number(service.durationMinutes),
       status: APPOINTMENT_STATUS.PENDING,
     });
-    changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
+    appointment.statusHistory.push({
+      status: APPOINTMENT_STATUS.PENDING,
       changedBy: "customer",
-      note: "Customer booked the appointment.",
+      note: "Customer requested an appointment.",
+      changedAt: new Date(),
     });
     await appointment.save();
 
     await createAppointmentNotifications({
       appointment,
-      type: "booking_confirmed",
-      title: "Appointment confirmed",
-      message: `Your ${service.name} appointment on ${date} at ${startTime} has been confirmed.`,
+      type: "booking_pending",
+      title: "Appointment request received",
+      message: `Your ${service.name} appointment request for ${date} at ${startTime} is waiting for staff confirmation.`,
     });
 
     return res.status(201).json({
-      message: "Appointment booked successfully.",
+      message: "Appointment request submitted.",
       appointment: {
         _id: appointment._id,
         service: { _id: service._id, name: service.name },
@@ -601,6 +603,55 @@ export const createAppointment = async (req, res, next) => {
         date: appointment.date,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
+        status: appointment.status,
+        bookingReference: appointment.bookingReference,
+        statusHistory: appointment.statusHistory,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const confirmAppointment = async (req, res, next) => {
+  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
+  if (!validation.success) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  try {
+    const appointment = await Appointment.findById(req.params.id).populate(
+      "service",
+      "name",
+    );
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+
+    if (appointment.status !== APPOINTMENT_STATUS.PENDING) {
+      return res.status(400).json({
+        message: "Only pending appointments can be confirmed.",
+      });
+    }
+
+    changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
+      changedBy: String(req.user.id),
+      note: "Staff confirmed the appointment.",
+    });
+    appointment.staff = req.user.id;
+    await appointment.save();
+
+    await createAppointmentNotifications({
+      appointment,
+      type: "booking_confirmed",
+      title: "Appointment confirmed",
+      message: `Your ${appointment.service?.name || "appointment"} on ${appointment.date.toISOString().slice(0, 10)} at ${appointment.startTime} has been confirmed.`,
+    });
+
+    return res.status(200).json({
+      message: "Appointment confirmed.",
+      appointment: {
+        _id: appointment._id,
         status: appointment.status,
         bookingReference: appointment.bookingReference,
         statusHistory: appointment.statusHistory,

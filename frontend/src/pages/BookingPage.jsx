@@ -327,7 +327,8 @@ function BookingPage() {
                     endTime={slot?.endTime}
                   />
                   <p className="booking-review-note">
-                    Your appointment will be confirmed after you book.
+                    Your appointment will be pending until our staff confirms
+                    it.
                   </p>
                 </>
               )}

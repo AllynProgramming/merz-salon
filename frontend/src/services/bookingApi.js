@@ -1,7 +1,8 @@
 import { bookingSchedule } from "../config/bookingSchedule.js";
 
 const USE_MOCK_APPOINTMENT_API =
-  import.meta.env.VITE_USE_MOCK_APPOINTMENT_API !== "false";
+  import.meta.env.VITE_USE_MOCK_APPOINTMENT_API === "true";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 const MOCK_APPOINTMENTS_KEY = "merz.booking.mock-appointments";
 const mockAppointments = new Map(
@@ -36,7 +37,7 @@ async function readJson(response) {
 }
 
 async function request(path, { token, ...options } = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -244,13 +245,13 @@ export async function createAppointment({ serviceId, date, startTime, token }) {
     date,
     startTime: slot.startTime,
     endTime: slot.endTime,
-    status: "confirmed",
+    status: "pending",
     bookingReference: `MERZ-${Date.now().toString().slice(-8)}`,
     statusHistory: [
       {
-        status: "confirmed",
+        status: "pending",
         changedAt: new Date().toISOString(),
-        note: "Customer booked the appointment.",
+        note: "Customer requested an appointment.",
       },
     ],
     owner: token,

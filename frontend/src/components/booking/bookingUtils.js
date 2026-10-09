@@ -14,9 +14,26 @@ export function formatPrice(price) {
   }).format(Number(price) || 0);
 }
 
+export function toDateOnly(value) {
+  const dateOnly = String(value || "").slice(0, 10);
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateOnly) ||
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return "";
+  }
+  return dateOnly;
+}
+
 export function formatDate(value) {
-  if (!value) return "Choose a date";
-  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
+  const dateOnly = toDateOnly(value);
+  if (!dateOnly) return "Choose a date";
+  const [year, month, day] = dateOnly.split("-").map(Number);
   return new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(
     new Date(year, month - 1, day),
   );

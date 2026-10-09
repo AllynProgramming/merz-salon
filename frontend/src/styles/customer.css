@@ -191,6 +191,7 @@
 
 .customer-next-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 28px;
@@ -245,7 +246,14 @@
 }
 
 .customer-next-card .customer-status-pending {
-  color: #fff1b4;
+  border-color: #f8e8a5;
+  background: #f1d36a;
+  color: #183d2c;
+  box-shadow: 0 0 0 2px rgba(241, 211, 106, 0.16);
+}
+
+.customer-next-card .customer-status-pending .booking-status-icon {
+  color: #5f4a08;
 }
 
 .customer-status-confirmed {
@@ -279,6 +287,189 @@
   background: transparent;
   border-color: rgba(255, 255, 255, 0.5);
   color: #fff;
+}
+
+.customer-reschedule-panel {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding: 24px;
+  border-top: 3px solid #d8bc55;
+  background: #e8f0e5;
+  color: var(--customer-ink);
+}
+
+.customer-reschedule-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.customer-reschedule-heading h3 {
+  margin: 2px 0 0;
+  color: var(--customer-green);
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.customer-reschedule-heading > p {
+  max-width: 260px;
+  margin: 0;
+  color: #526657;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.customer-reschedule-kicker {
+  margin: 0;
+  color: #667b65;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.customer-reschedule-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.customer-reschedule-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--customer-green);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.customer-reschedule-fields input,
+.customer-reschedule-fields select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #b7cbb6;
+  border-radius: 0;
+  background: #fff;
+  color: var(--customer-ink);
+  font: inherit;
+}
+
+.customer-reschedule-fields input:focus,
+.customer-reschedule-fields select:focus {
+  outline: 3px solid rgba(216, 188, 85, 0.45);
+  outline-offset: 2px;
+  border-color: var(--customer-green);
+}
+
+.customer-reschedule-selection {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #d8bc55;
+  background: #f7f4e7;
+  color: #526657;
+  font-size: 13px;
+}
+
+.customer-reschedule-selection strong {
+  color: var(--customer-green);
+}
+
+.customer-reschedule-error,
+.customer-reschedule-notice {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.customer-reschedule-error {
+  color: #9a3328;
+}
+
+.customer-reschedule-notice {
+  color: #28643b;
+}
+
+.customer-reschedule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.customer-reschedule-actions .customer-button-outline {
+  border-color: #9bb39a;
+  color: var(--customer-green);
+}
+
+.customer-cancel-panel {
+  display: flex;
+  flex-basis: 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 4px;
+  padding: 20px 24px;
+  border-top: 3px solid #d99a92;
+  background: #f7e9e5;
+  color: #4c2925;
+}
+
+.customer-cancel-kicker {
+  margin: 0 0 4px;
+  color: #8a4b42;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.customer-cancel-panel h3 {
+  margin: 0;
+  color: #5c2d28;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.customer-cancel-panel p:not(.customer-cancel-kicker) {
+  max-width: 540px;
+  margin: 6px 0 0;
+  color: #70453f;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.customer-cancel-panel p strong {
+  color: #5c2d28;
+}
+
+.customer-cancel-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.customer-cancel-actions .customer-button-outline {
+  border-color: #c99790;
+  color: #5c2d28;
+}
+
+.customer-page .customer-button-danger {
+  border-color: #8f4036;
+  background: #8f4036;
+  color: #fff;
+}
+
+.customer-page .customer-button-danger:hover:not(:disabled) {
+  border-color: #73342d;
+  background: #73342d;
+}
+
+.customer-cancel-error {
+  margin: 0;
+  color: #8f3026;
+  font-size: 13px;
 }
 
 .customer-upcoming-section {
@@ -1143,7 +1334,48 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 17px;
+  }
+
+  .customer-reschedule-panel {
+    padding: 20px;
+  }
+
+  .customer-reschedule-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .customer-reschedule-heading > p {
+    max-width: none;
+  }
+
+  .customer-reschedule-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-reschedule-actions {
+    flex-direction: column-reverse;
+  }
+
+  .customer-reschedule-actions .customer-button {
+    width: 100%;
     margin-bottom: 25px;
+  }
+
+  .customer-cancel-panel {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+  }
+
+  .customer-cancel-actions {
+    flex-direction: column-reverse;
+  }
+
+  .customer-cancel-actions .customer-button {
+    width: 100%;
   }
 
   .customer-history-filters {
