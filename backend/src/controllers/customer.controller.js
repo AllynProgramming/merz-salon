@@ -112,6 +112,14 @@ const validationErrors = (issues) => {
   return errors;
 };
 
+const splitName = (name) => {
+  const [firstname, ...lastnameParts] = name.trim().split(/\s+/);
+  return {
+    firstname,
+    lastname: lastnameParts.join(" "),
+  };
+};
+
 export const getCustomerProfile = (req, res) => {
   return res.status(200).json({ user: sanitizeUser(req.user) });
 };
@@ -125,8 +133,12 @@ export const updateCustomerProfile = async (req, res, next) => {
     });
   }
 
+  const name = validation.data.name.trim();
+  const { firstname, lastname } = splitName(name);
   const updates = {
-    name: validation.data.name,
+    name,
+    firstname,
+    lastname,
     phone: validation.data.phone,
     address: validation.data.address ?? "",
     dateOfBirth: validation.data.dateOfBirth || null,
