@@ -15,19 +15,19 @@ import "../components/landing/landing.css";
 const salonSchema = {
   "@context": "https://schema.org",
   "@type": "HairSalon",
-  name: "[Salon Name]",
-  url: "https://yourdomain.com",
+  name: "MERZ Beauty Salon",
+  url: "https://merzbeauty.com",
   description:
     "Online salon booking and scheduling with real-time availability, reminders, and easy rescheduling.",
   address: {
     "@type": "PostalAddress",
-    streetAddress: "[Street]",
-    addressLocality: "[City]",
+    streetAddress: "Grema Subdivision",
+    addressLocality: "Malaybalay City",
     addressCountry: "PH",
   },
   potentialAction: {
     "@type": "ReserveAction",
-    target: "https://yourdomain.com/book-appointment",
+    target: "https://merzbeauty.com/book-appointment",
     name: "Book an appointment",
   },
 };
@@ -49,30 +49,30 @@ function LandingPage() {
   return (
     <div className="salon-landing">
       <Helmet>
-        <title>Online Salon Booking &amp; Scheduling | [Salon Name]</title>
+        <title>Online Salon Booking &amp; Scheduling | MERZ Beauty Salon</title>
         <meta
           name="description"
           content="Book your salon appointment online in minutes. Browse services and prices, pick a time slot, and get instant confirmation and reminders. Reserve your spot today."
         />
-        <link rel="canonical" href="https://yourdomain.com/" />
+        <link rel="canonical" href="https://merzbeauty.com/" />
         <meta
           property="og:title"
-          content="Online Salon Booking &amp; Scheduling | [Salon Name]"
+          content="Online Salon Booking &amp; Scheduling | MERZ Beauty Salon"
         />
         <meta
           property="og:description"
           content="Book your salon appointment online in minutes. Browse services and prices, pick a time slot, and get instant confirmation and reminders. Reserve your spot today."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://yourdomain.com/" />
+        <meta property="og:url" content="https://merzbeauty.com/" />
         <meta
           property="og:image"
-          content="https://yourdomain.com/og-image.jpg"
+          content="https://merzbeauty.com/og-image.jpg"
         />
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
-          content="Online Salon Booking &amp; Scheduling | [Salon Name]"
+          content="Online Salon Booking &amp; Scheduling | MERZ Beauty Salon"
         />
         <meta
           name="twitter:description"
@@ -80,7 +80,7 @@ function LandingPage() {
         />
         <meta
           name="twitter:image"
-          content="https://yourdomain.com/og-image.jpg"
+          content="https://merzbeauty.com/og-image.jpg"
         />
         <script type="application/ld+json">
           {JSON.stringify(salonSchema)}

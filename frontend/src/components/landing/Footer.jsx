@@ -5,9 +5,9 @@ function Footer() {
     <footer className="salon-footer">
       <div className="salon-container salon-footer-inner">
         <div className="salon-footer-address">
-          <p className="salon-footer-brand">[Salon Name]</p>
-          <address>[Street], [city]</address>
-          <a href="https://yourdomain.com">yourdomain.com</a>
+          <p className="salon-footer-brand">MERZ Beauty Salon</p>
+          <address>Grema Subdivision, Malaybalay City</address>
+          <a href="https://merzbeauty.com">merzbeauty.com</a>
         </div>
         <nav className="salon-footer-links" aria-label="Footer navigation">
           <Link to="/services">Services</Link>

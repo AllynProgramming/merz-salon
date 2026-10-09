@@ -78,24 +78,32 @@
 
 .salon-landing .salon-brand {
   display: inline-flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   font-family: var(--salon-display);
-  font-size: 25px;
+  font-size: clamp(1.2rem, 1.8vw, 1.7rem);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .salon-landing .salon-brand-mark {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: clamp(112px, 10vw, 132px);
+  height: 48px;
   place-items: center;
-  border-radius: 50% 50% 50% 12px;
-  background: var(--salon-gold);
-  color: var(--salon-green);
-  font-family: var(--salon-display);
-  font-size: 22px;
+  overflow: visible;
+  background: transparent;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.salon-landing .salon-brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 3px 0 rgba(24, 61, 44, 0.08));
 }
 
 .salon-landing .salon-menu {
@@ -130,6 +138,158 @@
 
 .salon-landing .salon-user-menu {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.salon-landing .salon-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.salon-landing .salon-notification-menu {
+  position: relative;
+}
+
+.salon-landing .salon-notification-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--salon-line);
+  border-radius: 50%;
+  background: #edf4ed;
+  color: var(--salon-green);
+  cursor: pointer;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.salon-landing .salon-notification-button:hover {
+  background: rgba(124, 163, 111, 0.14);
+  transform: translateY(-1px);
+}
+
+.salon-landing .salon-notification-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.salon-landing .salon-notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--salon-green);
+  color: var(--salon-white);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+}
+
+.salon-landing .salon-notification-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 60;
+  width: min(360px, 82vw);
+  border: 1px solid var(--salon-line);
+  background: var(--salon-white);
+  box-shadow: 0 16px 30px rgba(24, 61, 44, 0.14);
+}
+
+.salon-landing .salon-notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--salon-line);
+  color: var(--salon-ink);
+  font-size: 13px;
+}
+
+.salon-landing .salon-notification-header button {
+  border: 0;
+  background: transparent;
+  color: var(--salon-green);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.salon-landing .salon-notification-empty {
+  padding: 16px;
+  margin: 0;
+  color: var(--salon-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.salon-landing .salon-notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.salon-landing .salon-notification-list li {
+  border-bottom: 1px solid rgba(24, 61, 44, 0.08);
+}
+
+.salon-landing .salon-notification-list li:last-child {
+  border-bottom: 0;
+}
+
+.salon-landing .salon-notification-item {
+  display: grid;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--salon-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.salon-landing .salon-notification-list li.is-unread .salon-notification-item {
+  background: rgba(124, 163, 111, 0.06);
+}
+
+.salon-landing .salon-notification-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.salon-landing .salon-notification-message {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--salon-muted);
+}
+
+.salon-landing .salon-notification-time {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--salon-muted);
 }
 
 .salon-landing .salon-user-trigger {
@@ -954,6 +1114,11 @@
 
   .salon-landing .salon-nav-inner {
     min-height: 68px;
+  }
+
+  .salon-landing .salon-brand-mark {
+    width: 96px;
+    height: 40px;
   }
 
   .salon-landing .salon-menu-toggle {

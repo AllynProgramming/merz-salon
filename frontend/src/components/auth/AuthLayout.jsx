@@ -17,7 +17,7 @@ function AuthLayout({ children, page = "login" }) {
             aria-label="MERZ Beauty Salon home"
           >
             <span className="auth-brand-mark" aria-hidden="true">
-              M
+              <img src="/logo-mark.png" alt="" />
             </span>
             <span>MERZ Beauty Salon</span>
           </Link>

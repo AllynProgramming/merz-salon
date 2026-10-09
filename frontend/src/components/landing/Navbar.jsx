@@ -22,7 +22,7 @@ function Navbar() {
           onClick={closeMenu}
         >
           <span className="salon-brand-mark" aria-hidden="true">
-            M
+            <img src="/logo-mark.png" alt="" />
           </span>
           <span>MERZ Beauty Salon</span>
         </Link>
