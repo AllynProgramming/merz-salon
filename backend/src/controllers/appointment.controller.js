@@ -281,7 +281,8 @@ export const listAppointments = async (req, res, next) => {
       page = 1,
       limit = 10,
     } = validation.data;
-    const filters = [{ customer: req.user.id }];
+    const isStaffView = ["staff", "admin"].includes(req.user.role);
+    const filters = isStaffView ? [] : [{ customer: req.user.id }];
 
     if (status) {
       filters.push({ status });
