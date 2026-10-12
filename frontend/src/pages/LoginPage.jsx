@@ -51,11 +51,12 @@ function LoginPage() {
     setLoading(true);
     setServerError("");
     try {
-      await login({ email: values.email.trim(), password: values.password });
+      const user = await login({ email: values.email.trim(), password: values.password });
       const requestedPage = location.state?.from;
+      const fallback = user?.role === "customer" ? "/dashboard" : "/admin";
       const destination = requestedPage
         ? `${requestedPage.pathname}${requestedPage.search || ""}${requestedPage.hash || ""}`
-        : "/dashboard";
+        : fallback;
       navigate(destination, { replace: true });
     } catch (error) {
       setServerError(error.message || "Invalid email or password.");

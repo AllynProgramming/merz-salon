@@ -11,6 +11,8 @@ import AppointmentPage from "./pages/AppointmentPage.jsx";
 import ReschedulePage from "./pages/ReschedulePage.jsx";
 import BookingConfirmationPage from "./pages/BookingConfirmationPage.jsx";
 import AppointmentsPage from "./pages/AppointmentsPage.jsx";
+import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
+import AdminSchedulePage from "./pages/AdminSchedulePage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -31,6 +33,13 @@ function Routes() {
           path: "/appointments/:id/confirmation",
           element: <BookingConfirmationPage />,
         },
+      ],
+    },
+    {
+      element: <ProtectedRoute allowedRoles={["staff", "admin"]} />,
+      children: [
+        { path: "/admin", element: <AdminDashboardPage /> },
+        { path: "/admin/schedule", element: <AdminSchedulePage /> },
       ],
     },
   ]);

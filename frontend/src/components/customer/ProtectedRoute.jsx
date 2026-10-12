@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import useAuth from "../../context/useAuth.js";
 
-function ProtectedRoute() {
+function ProtectedRoute({ allowedRoles = ["customer"] }) {
   const { user, isRestoring, authNotice } = useAuth();
   const location = useLocation();
 
@@ -21,6 +21,11 @@ function ProtectedRoute() {
         state={{ from: location, notice: authNotice }}
       />
     );
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    const fallbackPath = user.role === "customer" ? "/dashboard" : "/admin";
+    return <Navigate to={fallbackPath} replace state={{ from: location }} />;
   }
 
   return <Outlet />;

@@ -1,6 +1,9 @@
 import { Router } from "express";
 
-import { confirmAppointment } from "../controllers/appointment.controller.js";
+import {
+  confirmAppointment,
+  listAppointments,
+} from "../controllers/appointment.controller.js";
 import {
   protect,
   requireStaffOrAdmin,
@@ -9,6 +12,7 @@ import {
 const router = Router();
 
 router.use(protect, requireStaffOrAdmin);
+router.get("/", listAppointments);
 router.patch("/:id/confirm", confirmAppointment);
 
 export default router;

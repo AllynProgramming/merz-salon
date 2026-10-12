@@ -9,8 +9,8 @@ import { protect, requireCustomer } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+router.get("/me", protect, getCustomerProfile);
 router.use(protect, requireCustomer);
-router.get("/me", getCustomerProfile);
 router.put("/me", updateCustomerProfile);
 router.put("/me/password", changeCustomerPassword);
 

@@ -170,10 +170,9 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    if (user.role !== "customer") {
-      return res
-        .status(403)
-        .json({ message: "This login is for customer accounts" });
+    const allowedRoles = ["customer", "staff", "admin"];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ message: "This account is not allowed to sign in here." });
     }
 
     const token = generateToken(user._id);
