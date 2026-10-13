@@ -106,6 +106,14 @@ function AdminDashboardPage() {
             {user?.role === "admin" && (
               <Link
                 className="customer-button customer-button-outline admin-dashboard__manage"
+                to="/admin/feedback"
+              >
+                Customer Feedback
+              </Link>
+            )}
+            {user?.role === "admin" && (
+              <Link
+                className="customer-button customer-button-outline admin-dashboard__manage"
                 to="/admin/services"
               >
                 Manage Services

@@ -325,8 +325,11 @@ export const listAppointments = async (req, res, next) => {
         effectiveSort === "date_asc"
           ? { date: 1, startTime: 1 }
           : { date: -1, startTime: -1 },
-      )
-      .lean();
+      );
+    if (isStaffView) {
+      query.populate("customer", "name firstname lastname");
+    }
+    query.lean();
 
     const [
       total,
@@ -388,6 +391,14 @@ export const listAppointments = async (req, res, next) => {
       const feedback = feedbackMap.get(String(appointment._id));
       return {
         _id: appointment._id,
+        ...(isStaffView && {
+          customerName:
+            appointment.customer?.name ||
+            [appointment.customer?.firstname, appointment.customer?.lastname]
+              .filter(Boolean)
+              .join(" ") ||
+            "Customer",
+        }),
         service: appointment.service
           ? { _id: appointment.service._id, name: appointment.service.name }
           : null,

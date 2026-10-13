@@ -159,6 +159,41 @@ export const getMyFeedback = async (req, res, next) => {
   }
 };
 
+export const getAdminFeedback = async (req, res, next) => {
+  try {
+    const [items, summaries] = await Promise.all([
+      Feedback.find({})
+        .populate("customer", "name firstname lastname")
+        .populate("service", "name averageRating ratingCount")
+        .populate("appointment", "date startTime endTime status")
+        .sort({ createdAt: -1 })
+        .lean(),
+      Feedback.aggregate([
+        {
+          $group: {
+            _id: null,
+            averageRating: { $avg: "$rating" },
+            ratingCount: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+    const summary = summaries[0];
+
+    return res.status(200).json({
+      items,
+      summary: {
+        averageRating: summary
+          ? Number(summary.averageRating.toFixed(1))
+          : null,
+        ratingCount: summary?.ratingCount || 0,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getFeedbackForAppointment = async (req, res, next) => {
   if (!/^[a-f\d]{24}$/i.test(req.params.id)) {
     return res.status(400).json({ message: "Invalid appointment id." });

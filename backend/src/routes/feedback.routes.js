@@ -2,14 +2,20 @@ import { Router } from "express";
 
 import {
   createFeedback,
+  getAdminFeedback,
   getFeedbackForAppointment,
   getMyFeedback,
   updateFeedback,
 } from "../controllers/feedback.controller.js";
-import { protect, requireCustomer } from "../middlewares/auth.middleware.js";
+import {
+  protect,
+  requireAdmin,
+  requireCustomer,
+} from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+router.get("/admin", protect, requireAdmin, getAdminFeedback);
 router.use(protect, requireCustomer);
 router.post("/", createFeedback);
 router.get("/mine", getMyFeedback);
