@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import useAuth from "../context/useAuth.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
@@ -24,11 +24,27 @@ function formatTime(value) {
 }
 
 function AdminDashboardPage() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [statusCounts, setStatusCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      navigate("/login", {
+        replace: true,
+        state: { notice: "You've been logged out." },
+      });
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -95,6 +111,14 @@ function AdminDashboardPage() {
                 Manage Services
               </Link>
             )}
+            <button
+              className="customer-button customer-button-outline admin-dashboard__logout"
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              {loggingOut ? "Logging out..." : "Log out"}
+            </button>
           </div>
         </header>
 

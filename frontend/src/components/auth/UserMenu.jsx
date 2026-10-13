@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth.js";
+import { getDashboardPath } from "../../utils/accountRole.js";
 
 function UserMenu() {
   const { user, logout, token } = useAuth();
@@ -17,6 +18,7 @@ function UserMenu() {
     user?.name ||
     [user?.firstname, user?.lastname].filter(Boolean).join(" ") ||
     "Customer";
+  const isCustomer = user?.role === "customer";
   const initials = fullName
     .split(/\s+/)
     .slice(0, 2)
@@ -264,37 +266,41 @@ function UserMenu() {
             ref={(node) => {
               itemRefs.current[0] = node;
             }}
-            to="/dashboard"
+            to={getDashboardPath(user?.role) || "/"}
             role="menuitem"
             tabIndex={-1}
             onClick={() => setOpen(false)}
           >
-            Dashboard
+            {isCustomer ? "Dashboard" : "Admin Dashboard"}
           </NavLink>
-          <NavLink
-            className={({ isActive }) => (isActive ? "is-active" : "")}
-            ref={(node) => {
-              itemRefs.current[1] = node;
-            }}
-            to="/appointments"
-            role="menuitem"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-          >
-            My Appointments
-          </NavLink>
-          <NavLink
-            className={({ isActive }) => (isActive ? "is-active" : "")}
-            ref={(node) => {
-              itemRefs.current[2] = node;
-            }}
-            to="/profile"
-            role="menuitem"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-          >
-            Profile
-          </NavLink>
+          {isCustomer && (
+            <>
+              <NavLink
+                className={({ isActive }) => (isActive ? "is-active" : "")}
+                ref={(node) => {
+                  itemRefs.current[1] = node;
+                }}
+                to="/appointments"
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => setOpen(false)}
+              >
+                My Appointments
+              </NavLink>
+              <NavLink
+                className={({ isActive }) => (isActive ? "is-active" : "")}
+                ref={(node) => {
+                  itemRefs.current[2] = node;
+                }}
+                to="/profile"
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => setOpen(false)}
+              >
+                Profile
+              </NavLink>
+            </>
+          )}
           <button
             ref={(node) => {
               itemRefs.current[3] = node;

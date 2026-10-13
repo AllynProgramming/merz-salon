@@ -51,6 +51,18 @@
   transform: translateY(-2px);
 }
 
+.admin-dashboard-page .admin-dashboard__logout {
+  border-color: rgba(32, 86, 56, 0.45);
+  background: transparent;
+  color: #205638;
+}
+
+.admin-dashboard-page .admin-dashboard__logout:hover:not(:disabled) {
+  border-color: #a33f37;
+  background: #fff5f3;
+  color: #8b302b;
+}
+
 .admin-dashboard__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
