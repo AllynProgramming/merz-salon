@@ -6,6 +6,7 @@ import AuthLayout from "../components/auth/AuthLayout.jsx";
 import Button from "../components/auth/Button.jsx";
 import FormField from "../components/auth/FormField.jsx";
 import PasswordInput from "../components/auth/PasswordInput.jsx";
+import { getDashboardPath } from "../utils/accountRole.js";
 
 function validate(values) {
   const errors = {};
@@ -53,7 +54,7 @@ function LoginPage() {
     try {
       const user = await login({ email: values.email.trim(), password: values.password });
       const requestedPage = location.state?.from;
-      const fallback = user?.role === "customer" ? "/dashboard" : "/admin";
+      const fallback = getDashboardPath(user?.role) || "/";
       const destination = requestedPage
         ? `${requestedPage.pathname}${requestedPage.search || ""}${requestedPage.hash || ""}`
         : fallback;

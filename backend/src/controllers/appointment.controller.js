@@ -328,7 +328,13 @@ export const listAppointments = async (req, res, next) => {
       )
       .lean();
 
-    const [total, allCount, upcomingCount, pastCount] = await Promise.all([
+    const [
+      total,
+      allCount,
+      upcomingCount,
+      pastCount,
+      statusCountValues,
+    ] = await Promise.all([
       Appointment.countDocuments(filter),
       Appointment.countDocuments({ $and: commonFilters }),
       Appointment.countDocuments({
@@ -343,7 +349,25 @@ export const listAppointments = async (req, res, next) => {
           ...filtersForAppointmentType("past", today, currentTime),
         ],
       }),
+      Promise.all(
+        Object.values(APPOINTMENT_STATUS).map((appointmentStatus) =>
+          Appointment.countDocuments({
+            $and: [
+              ...commonFilters.filter(
+                (commonFilter) => !Object.hasOwn(commonFilter, "status"),
+              ),
+              { status: appointmentStatus },
+            ],
+          }),
+        ),
+      ),
     ]);
+    const statusCounts = Object.fromEntries(
+      Object.values(APPOINTMENT_STATUS).map((appointmentStatus, index) => [
+        appointmentStatus,
+        statusCountValues[index],
+      ]),
+    );
     const offset = (page - 1) * limit;
     const items = await query.skip(offset).limit(limit);
 
@@ -397,6 +421,7 @@ export const listAppointments = async (req, res, next) => {
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
       counts: { all: allCount, upcoming: upcomingCount, past: pastCount },
+      statusCounts,
     });
   } catch (error) {
     return next(error);

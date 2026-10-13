@@ -8,7 +8,7 @@ function AuthLayout({ children, page = "login" }) {
         <section
           className="auth-form-panel"
           aria-label={
-            page === "register" ? "Create a customer account" : "Customer login"
+            page === "register" ? "Create a customer account" : "Account login"
           }
         >
           <Link

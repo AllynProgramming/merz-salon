@@ -26,6 +26,7 @@ function formatTime(value) {
 function AdminDashboardPage() {
   const { user, token } = useAuth();
   const [appointments, setAppointments] = useState([]);
+  const [statusCounts, setStatusCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -41,7 +42,10 @@ function AdminDashboardPage() {
         if (!response.ok) {
           throw new Error(payload.message || "Could not load appointments.");
         }
-        if (active) setAppointments(payload.items || payload.appointments || []);
+        if (active) {
+          setAppointments(payload.items || payload.appointments || []);
+          setStatusCounts(payload.statusCounts || {});
+        }
       } catch (requestError) {
         if (active) setError(requestError.message || "Could not load appointments.");
       } finally {
@@ -55,8 +59,10 @@ function AdminDashboardPage() {
     };
   }, [token]);
 
-  const pendingCount = appointments.filter((item) => item.status === "pending").length;
-  const confirmedCount = appointments.filter((item) => item.status === "confirmed").length;
+  const totalCount = Object.values(statusCounts).reduce(
+    (total, count) => total + count,
+    0,
+  );
 
   return (
     <div className="customer-page salon-landing admin-dashboard-page">
@@ -74,12 +80,22 @@ function AdminDashboardPage() {
               Here’s the latest appointment overview.
             </p>
           </div>
-          <Link
-            className="customer-button customer-button-outline admin-dashboard__manage"
-            to="/admin/schedule"
-          >
-            Manage Schedule
-          </Link>
+          <div className="admin-dashboard__heading-actions">
+            <Link
+              className="customer-button customer-button-outline admin-dashboard__manage"
+              to="/admin/schedule"
+            >
+              Manage Schedule
+            </Link>
+            {user?.role === "admin" && (
+              <Link
+                className="customer-button customer-button-outline admin-dashboard__manage"
+                to="/admin/services"
+              >
+                Manage Services
+              </Link>
+            )}
+          </div>
         </header>
 
         {error && (
@@ -94,25 +110,37 @@ function AdminDashboardPage() {
         >
           <article className="admin-dashboard__stat admin-dashboard__stat--pending">
             <p>Pending</p>
-            <strong>{pendingCount}</strong>
+            <strong>{statusCounts.pending ?? 0}</strong>
             <span>Awaiting confirmation</span>
           </article>
           <article className="admin-dashboard__stat admin-dashboard__stat--confirmed">
             <p>Confirmed</p>
-            <strong>{confirmedCount}</strong>
+            <strong>{statusCounts.confirmed ?? 0}</strong>
             <span>Ready for the salon</span>
+          </article>
+          <article className="admin-dashboard__stat admin-dashboard__stat--completed">
+            <p>Completed</p>
+            <strong>{statusCounts.completed ?? 0}</strong>
+            <span>Appointments already served</span>
+          </article>
+          <article className="admin-dashboard__stat admin-dashboard__stat--cancelled">
+            <p>Cancelled</p>
+            <strong>{statusCounts.cancelled ?? 0}</strong>
+            <span>Appointments no longer scheduled</span>
           </article>
           <article className="admin-dashboard__stat admin-dashboard__stat--total">
             <p>Total appointments</p>
-            <strong>{appointments.length}</strong>
-            <span>Across the current schedule</span>
+            <strong>
+              {statusCounts.pending !== undefined ? totalCount : appointments.length}
+            </strong>
+            <span>Across all appointment statuses</span>
           </article>
         </section>
 
         <section className="customer-panel admin-dashboard__panel">
           <div className="customer-panel-header admin-dashboard__panel-header">
             <h2>Recent appointments</h2>
-            <span>{appointments.length} in schedule</span>
+            <span>{totalCount || appointments.length} in schedule</span>
           </div>
 
           {loading ? (

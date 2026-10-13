@@ -199,6 +199,41 @@ export async function getService(serviceId) {
   return payload.service || payload;
 }
 
+export async function getAdminServices(token) {
+  const payload = await request("/api/services/admin", { token });
+  return payload.services || [];
+}
+
+export async function createService(service, token) {
+  return request("/api/services", {
+    method: "POST",
+    token,
+    body: JSON.stringify(service),
+  });
+}
+
+export async function updateService(serviceId, service, token) {
+  return request(`/api/services/${encodeURIComponent(serviceId)}`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(service),
+  });
+}
+
+export async function removeService(serviceId, token) {
+  return request(`/api/services/${encodeURIComponent(serviceId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function restoreService(serviceId, token) {
+  return request(
+    `/api/services/${encodeURIComponent(serviceId)}/restore`,
+    { method: "PATCH", token },
+  );
+}
+
 export async function getAvailability({
   serviceId,
   date,

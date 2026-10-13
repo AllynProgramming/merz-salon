@@ -7,6 +7,7 @@ import Button from "../components/auth/Button.jsx";
 import FormField from "../components/auth/FormField.jsx";
 import PasswordInput from "../components/auth/PasswordInput.jsx";
 import PasswordStrength from "../components/auth/PasswordStrength.jsx";
+import { getDashboardPath } from "../utils/accountRole.js";
 
 function validate(values, acceptedTerms) {
   const errors = {};
@@ -84,13 +85,13 @@ function RegisterPage() {
     setLoading(true);
     setServerError("");
     try {
-      await register({
+      const user = await register({
         name: values.name.trim(),
         email: values.email.trim(),
         phone: values.phone.trim(),
         password: values.password,
       });
-      navigate("/dashboard", { replace: true });
+      navigate(getDashboardPath(user?.role) || "/", { replace: true });
     } catch (error) {
       const phoneRequired =
         !values.phone.trim() && error.message === "Enter your phone number";

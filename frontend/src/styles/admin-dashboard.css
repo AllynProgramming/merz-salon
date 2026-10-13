@@ -13,6 +13,12 @@
   border-bottom: 1px solid rgba(32, 86, 56, 0.2);
 }
 
+.admin-dashboard__heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .admin-dashboard__heading .customer-eyebrow {
   margin-bottom: 10px;
   color: #627d61;
@@ -75,6 +81,14 @@
 
 .admin-dashboard__stat--confirmed::before {
   background: #5c8e68;
+}
+
+.admin-dashboard__stat--completed::before {
+  background: #718175;
+}
+
+.admin-dashboard__stat--cancelled::before {
+  background: #a33f37;
 }
 
 .admin-dashboard__stat p {
@@ -178,6 +192,10 @@
     align-items: stretch;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .admin-dashboard__heading-actions {
+    flex-direction: column;
   }
 
   .admin-dashboard__manage {

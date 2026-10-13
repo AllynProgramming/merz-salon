@@ -13,6 +13,7 @@ import BookingConfirmationPage from "./pages/BookingConfirmationPage.jsx";
 import AppointmentsPage from "./pages/AppointmentsPage.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import AdminSchedulePage from "./pages/AdminSchedulePage.jsx";
+import AdminServicesPage from "./pages/AdminServicesPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -41,6 +42,10 @@ function Routes() {
         { path: "/admin", element: <AdminDashboardPage /> },
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
       ],
+    },
+    {
+      element: <ProtectedRoute allowedRoles={["admin"]} />,
+      children: [{ path: "/admin/services", element: <AdminServicesPage /> }],
     },
   ]);
 
