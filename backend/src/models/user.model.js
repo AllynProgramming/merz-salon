@@ -60,6 +60,20 @@ const userSchema = new mongoose.Schema(
       enum: ["customer", "staff", "admin"],
       default: "customer",
     },
+    workingHours: {
+      type: [
+        new mongoose.Schema(
+          {
+            weekday: { type: Number, min: 0, max: 6, required: true },
+            enabled: { type: Boolean, default: false },
+            startTime: { type: String, default: "09:00" },
+            endTime: { type: String, default: "18:00" },
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
   },
   {
     timestamps: true,

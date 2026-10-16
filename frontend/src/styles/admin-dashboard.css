@@ -83,6 +83,136 @@
   margin: 28px 0 34px;
 }
 
+.admin-dashboard__today-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(225px, 0.7fr);
+  align-items: start;
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.admin-dashboard__today-panel {
+  min-width: 0;
+}
+
+.admin-dashboard__today-date {
+  margin: 5px 0 0;
+  color: #718175;
+  font-size: 12px;
+}
+
+.admin-dashboard__text-link {
+  flex: 0 0 auto;
+  color: #205638;
+  font-size: 13px;
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.admin-dashboard__text-link:focus-visible,
+.admin-dashboard__schedule-link:focus-visible {
+  outline: 2px solid #205638;
+  outline-offset: 3px;
+}
+
+.admin-dashboard__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+
+.admin-dashboard__search input,
+.admin-dashboard__status-filter select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid rgba(32, 86, 56, 0.24);
+  border-radius: 0;
+  background: #fff;
+  color: #183d2c;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-dashboard__search input:focus-visible,
+.admin-dashboard__status-filter select:focus-visible {
+  outline: 2px solid #205638;
+  outline-offset: 2px;
+}
+
+.admin-dashboard__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.admin-dashboard__today-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-dashboard__today-metric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(32, 86, 56, 0.14);
+  background: #fff;
+}
+
+.admin-dashboard__today-metric > span {
+  color: #52695a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admin-dashboard__today-metric > strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: #183d2c;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.admin-dashboard__today-metric > p {
+  margin: 0;
+  color: #718175;
+  font-size: 11px;
+}
+
+.admin-dashboard__today-metric--featured {
+  border-left: 4px solid #205638;
+}
+
+.admin-dashboard-page .admin-dashboard__schedule-link {
+  display: block;
+  padding: 13px 15px;
+  background: #205638;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  text-decoration: none;
+}
+
+.admin-dashboard-page .admin-dashboard__schedule-link:hover,
+.admin-dashboard-page .admin-dashboard__schedule-link:visited {
+  color: #fff;
+}
+
+.admin-dashboard-page .admin-dashboard__schedule-link:hover {
+  background: #173f2b;
+}
+
 .admin-dashboard__stat {
   position: relative;
   min-height: 154px;
@@ -214,6 +344,111 @@
 
 .admin-schedule-page {
   background: #f2f6f1;
+}
+
+.admin-schedule__hours-panel {
+  margin-bottom: 18px;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.admin-schedule__hours-panel .customer-panel-header {
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.admin-schedule__hours-panel .customer-panel-header h2 {
+  margin: 0;
+  color: #183d2c;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.admin-schedule__hours-panel .customer-panel-header p {
+  margin: 6px 0 0;
+  color: #718175;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-schedule__hours-form {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+
+.admin-schedule__staff-select,
+.admin-schedule__time-field {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-schedule__staff-select > span {
+  color: #52695a;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.admin-schedule__staff-select select,
+.admin-schedule__time-field input,
+.admin-schedule__assign-select {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid rgba(32, 86, 56, 0.24);
+  border-radius: 0;
+  background: #fff;
+  color: #183d2c;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-schedule__hours-list {
+  width: min(100%, 540px);
+  border-top: 1px solid rgba(32, 86, 56, 0.14);
+}
+
+.admin-schedule__hours-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(115px, 0.8fr) auto minmax(115px, 0.8fr) minmax(55px, 0.5fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  border-bottom: 1px solid rgba(32, 86, 56, 0.14);
+}
+
+.admin-schedule__hours-day {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #183d2c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-schedule__hours-day input {
+  accent-color: #205638;
+}
+
+.admin-schedule__time-field input:disabled {
+  background: #f2f6f1;
+  color: #718175;
+}
+
+.admin-schedule__time-separator,
+.admin-schedule__day-off {
+  color: #718175;
+  font-size: 12px;
+}
+
+.admin-schedule__assign-select {
+  max-width: 160px;
+  min-height: 34px;
+}
+
+.admin-schedule__hours-panel :is(input, select, button):focus-visible,
+.admin-schedule__assign-select:focus-visible {
+  outline: 2px solid #205638;
+  outline-offset: 2px;
 }
 
 .admin-schedule__workspace {
@@ -664,6 +899,43 @@
     grid-template-columns: 1fr;
     gap: 10px;
     margin: 20px 0 24px;
+  }
+
+  .admin-schedule__hours-row {
+    grid-template-columns: minmax(95px, 1fr) minmax(95px, 1fr) auto minmax(95px, 1fr);
+    gap: 7px;
+    padding-block: 7px;
+  }
+
+  .admin-schedule__hours-day {
+    grid-row: 1;
+  }
+
+  .admin-schedule__day-off {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+
+  .admin-schedule__hours-row .admin-schedule__time-field:last-of-type {
+    grid-column: 4;
+  }
+
+  .admin-dashboard__today-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .admin-dashboard__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard__panel-header {
+    align-items: flex-start;
+  }
+
+  .admin-dashboard__text-link {
+    padding-top: 4px;
   }
 
   .admin-dashboard__stat {

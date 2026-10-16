@@ -80,8 +80,47 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
+const weekdayNames = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+function defaultWorkingHours() {
+  return weekdayNames.map((_, weekday) => ({
+    weekday,
+    enabled: weekday !== 0,
+    startTime: "09:00",
+    endTime: "18:00",
+  }));
+}
+
+function workingHoursForStaff(member) {
+  const savedHours = new Map(
+    (member?.workingHours || []).map((hours) => [hours.weekday, hours]),
+  );
+  return defaultWorkingHours().map(
+    (hours) => savedHours.get(hours.weekday) || hours,
+  );
+}
+
+async function fetchStaff(token) {
+  const response = await fetch("/api/admin/staff", {
+    Authorization: ["Bearer", token].join(" "),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message || "Could not load staff members.");
+  }
+  return payload.staff || [];
+}
+
 function AdminSchedulePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
@@ -92,7 +131,13 @@ function AdminSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [assigningId, setAssigningId] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [staff, setStaff] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(user?.role === "admin");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [workingHours, setWorkingHours] = useState(defaultWorkingHours);
+  const [savingHours, setSavingHours] = useState(false);
   const calendarDays = getCalendarDays(viewMonth);
   const weekDays = getWeekDays(dateFromKey(selectedDate));
   const rangeStart =
@@ -152,6 +197,35 @@ function AdminSchedulePage() {
       active = false;
     };
   }, [token, viewMonth, viewMode, rangeStart, refreshVersion]);
+
+  useEffect(() => {
+    if (user?.role !== "admin" || !token) return undefined;
+    let active = true;
+    fetchStaff(token)
+      .then((members) => {
+        if (active) {
+          const initialStaffId = members[0]?._id || "";
+          setStaff(members);
+          setSelectedStaffId(initialStaffId);
+          setWorkingHours(
+            workingHoursForStaff(
+              members.find((member) => member._id === initialStaffId),
+            ),
+          );
+        }
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(requestError.message || "Could not load staff members.");
+        }
+      })
+      .finally(() => {
+        if (active) setStaffLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, user?.role]);
 
   const changeMonth = (amount) => {
     const nextMonth = new Date(
@@ -213,6 +287,91 @@ function AdminSchedulePage() {
     }
   };
 
+  const assignStaff = async (appointmentId, staffId) => {
+    setAssigningId(appointmentId);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/staff/appointments/${appointmentId}/assign`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: ["Bearer", token].join(" "),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ staffId: staffId || null }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not assign this appointment.");
+      }
+      setAppointments((current) =>
+        current.map((appointment) =>
+          appointment._id === appointmentId
+            ? {
+                ...appointment,
+                staffId: payload.staffId,
+                staffName: payload.staffName,
+              }
+            : appointment,
+        ),
+      );
+    } catch (requestError) {
+      setError(requestError.message || "Could not assign this appointment.");
+    } finally {
+      setAssigningId("");
+    }
+  };
+
+  const updateWorkingHour = (weekday, updates) => {
+    setWorkingHours((current) =>
+      current.map((hours) =>
+        hours.weekday === weekday ? { ...hours, ...updates } : hours,
+      ),
+    );
+  };
+
+  const selectStaff = (staffId) => {
+    setSelectedStaffId(staffId);
+    setWorkingHours(
+      workingHoursForStaff(staff.find((member) => member._id === staffId)),
+    );
+  };
+
+  const saveWorkingHours = async (event) => {
+    event.preventDefault();
+    if (!selectedStaffId) return;
+    setSavingHours(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/admin/staff/${selectedStaffId}/working-hours`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: ["Bearer", token].join(" "),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ workingHours }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not save working hours.");
+      }
+      setStaff((current) =>
+        current.map((member) =>
+          member._id === selectedStaffId ? payload.staff : member,
+        ),
+      );
+    } catch (requestError) {
+      setError(requestError.message || "Could not save working hours.");
+    } finally {
+      setSavingHours(false);
+    }
+  };
+
   return (
     <div className="customer-page salon-landing admin-schedule-page">
       <Helmet>
@@ -237,6 +396,109 @@ function AdminSchedulePage() {
           </div>
         )}
 
+        {user?.role === "admin" && (
+          <section
+            className="customer-panel admin-schedule__hours-panel"
+            aria-labelledby="admin-schedule-hours-heading"
+          >
+            <div className="customer-panel-header">
+              <div>
+                <h2 id="admin-schedule-hours-heading">Staff working hours</h2>
+                <p>
+                  Set each team memberâ€™s weekly availability before assigning
+                  appointments.
+                </p>
+              </div>
+              {staffLoading && <span role="status">Loading staffâ€¦</span>}
+            </div>
+            {staff.length === 0 && !staffLoading ? (
+              <p className="customer-empty-state">
+                No staff accounts found. Create staff accounts before setting
+                their availability.
+              </p>
+            ) : (
+              <form className="admin-schedule__hours-form" onSubmit={saveWorkingHours}>
+                <label className="admin-schedule__staff-select">
+                  <span>Staff member</span>
+                  <select
+                    value={selectedStaffId}
+                    onChange={(event) => selectStaff(event.target.value)}
+                    disabled={staffLoading || staff.length === 0}
+                  >
+                    {staff.map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="admin-schedule__hours-list">
+                  {workingHours.map((hours) => (
+                    <div
+                      className="admin-schedule__hours-row"
+                      key={hours.weekday}
+                    >
+                      <label className="admin-schedule__hours-day">
+                        <input
+                          type="checkbox"
+                          checked={hours.enabled}
+                          onChange={(event) =>
+                            updateWorkingHour(hours.weekday, {
+                              enabled: event.target.checked,
+                            })
+                          }
+                        />
+                        <span>{weekdayNames[hours.weekday]}</span>
+                      </label>
+                      <label className="admin-schedule__time-field">
+                        <span className="admin-dashboard__visually-hidden">
+                          {weekdayNames[hours.weekday]} start time
+                        </span>
+                        <input
+                          type="time"
+                          value={hours.startTime}
+                          disabled={!hours.enabled}
+                          onChange={(event) =>
+                            updateWorkingHour(hours.weekday, {
+                              startTime: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <span className="admin-schedule__time-separator">to</span>
+                      <label className="admin-schedule__time-field">
+                        <span className="admin-dashboard__visually-hidden">
+                          {weekdayNames[hours.weekday]} end time
+                        </span>
+                        <input
+                          type="time"
+                          value={hours.endTime}
+                          disabled={!hours.enabled}
+                          onChange={(event) =>
+                            updateWorkingHour(hours.weekday, {
+                              endTime: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      {!hours.enabled && (
+                        <span className="admin-schedule__day-off">Day off</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className="customer-button customer-button-primary"
+                  type="submit"
+                  disabled={savingHours || !selectedStaffId}
+                >
+                  {savingHours ? "Saving hoursâ€¦" : "Save working hours"}
+                </button>
+              </form>
+            )}
+          </section>
+        )}
+
         <section
           className={`customer-panel admin-schedule__workspace ${viewMode === "week" ? "is-week-view" : ""}`}
         >
@@ -252,7 +514,7 @@ function AdminSchedulePage() {
                     viewMode === "month" ? changeMonth(-1) : changeWeek(-1)
                   }
                 >
-                  ‹
+                  â€¹
                 </button>
                 <button
                   type="button"
@@ -269,7 +531,7 @@ function AdminSchedulePage() {
                     viewMode === "month" ? changeMonth(1) : changeWeek(1)
                   }
                 >
-                  ›
+                  â€º
                 </button>
                 <div
                   className="admin-schedule__view-toggle"
@@ -387,9 +649,42 @@ function AdminSchedulePage() {
                                 <span>
                                   {appointment.customerName || "Customer"}
                                 </span>
+                                {appointment.staffName && (
+                                  <span>With {appointment.staffName}</span>
+                                )}
                               </div>
                               <div className="admin-schedule__appointment-actions">
                                 <StatusBadge status={appointment.status} />
+                                {user?.role === "admin" && (
+                                  <select
+                                    className="admin-schedule__assign-select"
+                                    aria-label={`Assign staff for ${appointment.customerName || "appointment"} at ${formatTime(appointment.startTime)}`}
+                                    value={appointment.staffId || ""}
+                                    disabled={
+                                      assigningId === appointment._id ||
+                                      staff.length === 0 ||
+                                      !["pending", "confirmed"].includes(
+                                        appointment.status,
+                                      )
+                                    }
+                                    onChange={(event) =>
+                                      assignStaff(
+                                        appointment._id,
+                                        event.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {staff.map((member) => (
+                                      <option
+                                        key={member._id}
+                                        value={member._id}
+                                      >
+                                        {member.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
                                 {appointment.status === "pending" && (
                                   <button
                                     type="button"
@@ -453,9 +748,36 @@ function AdminSchedulePage() {
                     <div className="admin-schedule__appointment-details">
                       <strong>{appointment.serviceName || "Salon service"}</strong>
                       <span>{appointment.customerName || "Customer"}</span>
+                      {appointment.staffName && (
+                        <span>With {appointment.staffName}</span>
+                      )}
                     </div>
                     <div className="admin-schedule__appointment-actions">
                       <StatusBadge status={appointment.status} />
+                      {user?.role === "admin" && (
+                        <select
+                          className="admin-schedule__assign-select"
+                          aria-label={`Assign staff for ${appointment.customerName || "appointment"} at ${formatTime(appointment.startTime)}`}
+                          value={appointment.staffId || ""}
+                          disabled={
+                            assigningId === appointment._id ||
+                            staff.length === 0 ||
+                            !["pending", "confirmed"].includes(
+                              appointment.status,
+                            )
+                          }
+                          onChange={(event) =>
+                            assignStaff(appointment._id, event.target.value)
+                          }
+                        >
+                          <option value="">Unassigned</option>
+                          {staff.map((member) => (
+                            <option key={member._id} value={member._id}>
+                              {member.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {appointment.status === "pending" && (
                         <button
                           type="button"

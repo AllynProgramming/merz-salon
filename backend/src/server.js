@@ -14,6 +14,7 @@ import appointmentRoutes from "./routes/appointments.routes.js";
 import staffAppointmentRoutes from "./routes/staff-appointments.routes.js";
 import notificationRoutes from "./routes/notifications.routes.js";
 import feedbackRoutes from "./routes/feedback.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
 
 config();
@@ -41,6 +42,7 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/staff/appointments", staffAppointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/customers", customerRoutes);
 
 app.use((req, res) => {

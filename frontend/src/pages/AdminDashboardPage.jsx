@@ -6,14 +6,6 @@ import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 
-function formatDate(value) {
-  if (!value) return "Date to be confirmed";
-  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-    new Date(year, month - 1, day),
-  );
-}
-
 function formatTime(value) {
   if (!value) return "Time to be confirmed";
   const [hours, minutes] = String(value).split(":").map(Number);
@@ -23,11 +15,54 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
+function dateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function fetchTodayAppointments(token, date) {
+  const fetchPage = async (page) => {
+    const query = new URLSearchParams({
+      from: date,
+      to: date,
+      sort: "date_asc",
+      page: String(page),
+      limit: "50",
+    });
+    const response = await fetch(`/api/staff/appointments?${query}`, {
+      headers: { Authorization: ["Bearer", token].join(" ") },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.message || "Could not load today's appointments.");
+    }
+    return payload;
+  };
+
+  const firstPage = await fetchPage(1);
+  const totalPages = Number(firstPage.totalPages) || 1;
+  const remainingPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      fetchPage(index + 2),
+    ),
+  );
+
+  return {
+    appointments: [firstPage, ...remainingPages].flatMap(
+      (payload) => payload.items || payload.appointments || [],
+    ),
+  };
+}
+
 function AdminDashboardPage() {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [statusCounts, setStatusCounts] = useState({});
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -51,15 +86,19 @@ function AdminDashboardPage() {
 
     async function loadAppointments() {
       try {
-        const response = await fetch("/api/staff/appointments", {
+        const response = await fetch("/api/staff/appointments?limit=1", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(payload.message || "Could not load appointments.");
         }
+        const todayResult = await fetchTodayAppointments(
+          token,
+          dateKey(new Date()),
+        );
         if (active) {
-          setAppointments(payload.items || payload.appointments || []);
+          setAppointments(todayResult.appointments);
           setStatusCounts(payload.statusCounts || {});
         }
       } catch (requestError) {
@@ -79,6 +118,28 @@ function AdminDashboardPage() {
     (total, count) => total + count,
     0,
   );
+  const customerCount = new Set(
+    appointments.map((appointment) => appointment.customerId).filter(Boolean),
+  ).size;
+  const serviceCount = new Set(
+    appointments.map(
+      (appointment) => appointment.service?._id || appointment.serviceName,
+    ),
+  ).size;
+  const searchTerm = search.trim().toLocaleLowerCase();
+  const visibleAppointments = appointments.filter((appointment) => {
+    const matchesStatus =
+      statusFilter === "all" || appointment.status === statusFilter;
+    const matchesSearch =
+      !searchTerm ||
+      `${appointment.customerName || ""} ${appointment.serviceName || ""}`
+        .toLocaleLowerCase()
+        .includes(searchTerm);
+    return matchesStatus && matchesSearch;
+  });
+  const todayLabel = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "full",
+  }).format(new Date());
 
   return (
     <div className="customer-page salon-landing admin-dashboard-page">
@@ -136,6 +197,113 @@ function AdminDashboardPage() {
           </div>
         )}
 
+        <section className="admin-dashboard__today-layout">
+          <section
+            className="customer-panel admin-dashboard__panel admin-dashboard__today-panel"
+            aria-labelledby="admin-dashboard-today-heading"
+          >
+            <div className="customer-panel-header admin-dashboard__panel-header">
+              <div>
+                <h2 id="admin-dashboard-today-heading">Today’s appointments</h2>
+                <p className="admin-dashboard__today-date">{todayLabel}</p>
+              </div>
+              <Link className="admin-dashboard__text-link" to="/admin/schedule">
+                Open schedule
+              </Link>
+            </div>
+
+            <div className="admin-dashboard__filters">
+              <label className="admin-dashboard__search">
+                <span className="admin-dashboard__visually-hidden">
+                  Search today’s appointments
+                </span>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search customer or service"
+                />
+              </label>
+              <label className="admin-dashboard__status-filter">
+                <span className="admin-dashboard__visually-hidden">
+                  Filter appointments by status
+                </span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+            </div>
+
+            {loading ? (
+              <p role="status">Loading today’s appointments…</p>
+            ) : appointments.length === 0 ? (
+              <p className="customer-empty-state">
+                No appointments scheduled for today.
+              </p>
+            ) : visibleAppointments.length === 0 ? (
+              <p className="customer-empty-state">
+                No appointments match these filters.
+              </p>
+            ) : (
+              <div className="admin-dashboard__list">
+                {visibleAppointments.map((appointment) => (
+                  <article
+                    key={appointment._id}
+                    className="admin-dashboard__appointment"
+                  >
+                    <div className="admin-dashboard__appointment-time">
+                      <strong>{formatTime(appointment.startTime)}</strong>
+                      <span>{formatTime(appointment.endTime)}</span>
+                    </div>
+                    <div className="admin-dashboard__appointment-details">
+                      <strong>{appointment.serviceName || "Salon service"}</strong>
+                      <span>{appointment.customerName || "Customer"}</span>
+                      {appointment.staffName && (
+                        <span>With {appointment.staffName}</span>
+                      )}
+                    </div>
+                    <StatusBadge status={appointment.status} />
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <aside
+            className="admin-dashboard__today-summary"
+            aria-label="Today at a glance"
+          >
+            <article className="admin-dashboard__today-metric admin-dashboard__today-metric--featured">
+              <span>Appointments today</span>
+              <strong>{loading ? "—" : appointments.length}</strong>
+              <p>Bookings on the salon calendar</p>
+            </article>
+            <article className="admin-dashboard__today-metric">
+              <span>Customers today</span>
+              <strong>{loading ? "—" : customerCount}</strong>
+              <p>Distinct customers with a booking</p>
+            </article>
+            <article className="admin-dashboard__today-metric">
+              <span>Services today</span>
+              <strong>{loading ? "—" : serviceCount}</strong>
+              <p>Different services booked</p>
+            </article>
+            <Link
+              className="admin-dashboard__schedule-link"
+              to="/admin/schedule"
+            >
+              Review appointments and schedule
+            </Link>
+          </aside>
+        </section>
+
         <section
           className="admin-dashboard__stats"
           aria-label="Appointment summary"
@@ -167,40 +335,6 @@ function AdminDashboardPage() {
             </strong>
             <span>Across all appointment statuses</span>
           </article>
-        </section>
-
-        <section className="customer-panel admin-dashboard__panel">
-          <div className="customer-panel-header admin-dashboard__panel-header">
-            <h2>Recent appointments</h2>
-            <span>{totalCount || appointments.length} in schedule</span>
-          </div>
-
-          {loading ? (
-            <p role="status">Loading appointment list…</p>
-          ) : appointments.length === 0 ? (
-            <p className="customer-empty-state">
-              No appointments yet. New bookings will appear here.
-            </p>
-          ) : (
-            <div className="admin-dashboard__list">
-              {appointments.slice(0, 6).map((appointment) => (
-                <article
-                  key={appointment._id}
-                  className="admin-dashboard__appointment"
-                >
-                  <div className="admin-dashboard__appointment-time">
-                    <strong>{formatTime(appointment.startTime)}</strong>
-                    <span>{formatDate(appointment.date)}</span>
-                  </div>
-                  <div className="admin-dashboard__appointment-details">
-                    <strong>{appointment.serviceName || "Salon service"}</strong>
-                    <span>{appointment.customerName || "Customer"}</span>
-                  </div>
-                  <StatusBadge status={appointment.status} />
-                </article>
-              ))}
-            </div>
-          )}
         </section>
       </main>
     </div>

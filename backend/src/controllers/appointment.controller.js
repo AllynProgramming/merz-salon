@@ -3,6 +3,7 @@ import { z } from "zod";
 import Appointment from "../models/appointment.model.js";
 import Feedback from "../models/feedback.model.js";
 import Service from "../models/service.model.js";
+import User from "../models/user.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
 import { salonSchedule } from "../config/schedule.js";
 import { changeAppointmentStatus } from "../utils/appointmentStatus.js";
@@ -50,6 +51,14 @@ const appointmentQuerySchema = z
 const appointmentDetailSchema = z
   .object({
     id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid appointment id."),
+  })
+  .strict();
+const staffAssignmentSchema = z
+  .object({
+    staffId: z
+      .string()
+      .regex(/^[a-f\d]{24}$/i, "Choose a valid staff member.")
+      .nullable(),
   })
   .strict();
 
@@ -321,6 +330,7 @@ export const listAppointments = async (req, res, next) => {
       sort || (type === "upcoming" ? "date_asc" : "date_desc");
     const query = Appointment.find(filter)
       .populate("service", "name price durationMinutes")
+      .populate("staff", "name firstname lastname")
       .sort(
         effectiveSort === "date_asc"
           ? { date: 1, startTime: 1 }
@@ -392,12 +402,24 @@ export const listAppointments = async (req, res, next) => {
       return {
         _id: appointment._id,
         ...(isStaffView && {
+          customerId: String(appointment.customer?._id || appointment.customer),
           customerName:
             appointment.customer?.name ||
             [appointment.customer?.firstname, appointment.customer?.lastname]
               .filter(Boolean)
               .join(" ") ||
             "Customer",
+        }),
+        ...(isStaffView && {
+          staffId: appointment.staff?._id
+            ? String(appointment.staff._id)
+            : null,
+          staffName:
+            appointment.staff?.name ||
+            [appointment.staff?.firstname, appointment.staff?.lastname]
+            .filter(Boolean)
+            .join(" ") ||
+            null,
         }),
         service: appointment.service
           ? { _id: appointment.service._id, name: appointment.service.name }
@@ -433,6 +455,100 @@ export const listAppointments = async (req, res, next) => {
       totalPages: Math.max(1, Math.ceil(total / limit)),
       counts: { all: allCount, upcoming: upcomingCount, past: pastCount },
       statusCounts,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const assignAppointmentStaff = async (req, res, next) => {
+  const idValidation = appointmentDetailSchema.safeParse({ id: req.params.id });
+  const bodyValidation = staffAssignmentSchema.safeParse(req.body);
+  if (!idValidation.success || !bodyValidation.success) {
+    return res.status(400).json({
+      message:
+        bodyValidation.error?.issues[0]?.message || "Invalid staff assignment.",
+    });
+  }
+
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+    if (
+      ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(
+        appointment.status,
+      )
+    ) {
+      return res.status(400).json({
+        message: "Only pending or confirmed appointments can be assigned.",
+      });
+    }
+
+    const { staffId } = bodyValidation.data;
+    if (!staffId) {
+      appointment.staff = null;
+      await appointment.save();
+      return res.status(200).json({
+        message: "Staff member removed from appointment.",
+        staffId: null,
+        staffName: null,
+      });
+    }
+
+    const staff = await User.findOne({
+      _id: staffId,
+      role: "staff",
+    }).select("name firstname lastname workingHours");
+    if (!staff) {
+      return res.status(404).json({ message: "Staff member not found." });
+    }
+
+    const weekday = appointment.date.getUTCDay();
+    const workday = staff.workingHours?.find(
+      (hours) => hours.weekday === weekday,
+    );
+    if (!workday || !workday.enabled) {
+      return res.status(409).json({
+        message: "This staff member is not scheduled to work on that day.",
+      });
+    }
+    if (
+      appointment.startTime < workday.startTime ||
+      appointment.endTime > workday.endTime
+    ) {
+      return res.status(409).json({
+        message: "The appointment falls outside this staff member’s working hours.",
+      });
+    }
+
+    const overlappingAppointment = await Appointment.exists({
+      _id: { $ne: appointment._id },
+      staff: staff._id,
+      date: appointment.date,
+      status: {
+        $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED],
+      },
+      startTime: { $lt: appointment.endTime },
+      endTime: { $gt: appointment.startTime },
+    });
+    if (overlappingAppointment) {
+      return res.status(409).json({
+        message: "This staff member already has an appointment at that time.",
+      });
+    }
+
+    appointment.staff = staff._id;
+    await appointment.save();
+    const staffName =
+      staff.name ||
+      [staff.firstname, staff.lastname].filter(Boolean).join(" ") ||
+      "Staff member";
+    return res.status(200).json({
+      message: "Staff member assigned.",
+      staffId: String(staff._id),
+      staffName,
     });
   } catch (error) {
     return next(error);
@@ -671,11 +787,49 @@ export const confirmAppointment = async (req, res, next) => {
       });
     }
 
+    if (req.user.role === "staff") {
+      if (
+        appointment.staff &&
+        String(appointment.staff) !== String(req.user.id)
+      ) {
+        return res.status(409).json({
+          message: "This appointment is assigned to another staff member.",
+        });
+      }
+      const workday = req.user.workingHours?.find(
+        (hours) => hours.weekday === appointment.date.getUTCDay(),
+      );
+      if (
+        !workday?.enabled ||
+        appointment.startTime < workday.startTime ||
+        appointment.endTime > workday.endTime
+      ) {
+        return res.status(409).json({
+          message: "You are not scheduled to work during this appointment.",
+        });
+      }
+      const overlappingAppointment = await Appointment.exists({
+        _id: { $ne: appointment._id },
+        staff: req.user.id,
+        date: appointment.date,
+        status: {
+          $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED],
+        },
+        startTime: { $lt: appointment.endTime },
+        endTime: { $gt: appointment.startTime },
+      });
+      if (overlappingAppointment) {
+        return res.status(409).json({
+          message: "You already have an appointment at that time.",
+        });
+      }
+    }
+
     changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
       changedBy: String(req.user.id),
       note: "Staff confirmed the appointment.",
     });
-    appointment.staff = req.user.id;
+    if (req.user.role === "staff") appointment.staff = req.user.id;
     await appointment.save();
 
     await createAppointmentNotifications({
