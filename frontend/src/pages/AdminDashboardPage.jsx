@@ -36,7 +36,9 @@ async function fetchTodayAppointments(token, date) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.message || "Could not load today's appointments.");
+      throw new Error(
+        payload.message || "Could not load today's appointments.",
+      );
     }
     return payload;
   };
@@ -44,9 +46,7 @@ async function fetchTodayAppointments(token, date) {
   const firstPage = await fetchPage(1);
   const totalPages = Number(firstPage.totalPages) || 1;
   const remainingPages = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) =>
-      fetchPage(index + 2),
-    ),
+    Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2)),
   );
 
   return {
@@ -102,7 +102,8 @@ function AdminDashboardPage() {
           setStatusCounts(payload.statusCounts || {});
         }
       } catch (requestError) {
-        if (active) setError(requestError.message || "Could not load appointments.");
+        if (active)
+          setError(requestError.message || "Could not load appointments.");
       } finally {
         if (active) setLoading(false);
       }
@@ -170,6 +171,14 @@ function AdminDashboardPage() {
                 to="/admin/feedback"
               >
                 Customer Feedback
+              </Link>
+            )}
+            {user?.role === "admin" && (
+              <Link
+                className="customer-button customer-button-outline admin-dashboard__manage"
+                to="/admin/reports"
+              >
+                Reports
               </Link>
             )}
             {user?.role === "admin" && (
@@ -263,7 +272,9 @@ function AdminDashboardPage() {
                       <span>{formatTime(appointment.endTime)}</span>
                     </div>
                     <div className="admin-dashboard__appointment-details">
-                      <strong>{appointment.serviceName || "Salon service"}</strong>
+                      <strong>
+                        {appointment.serviceName || "Salon service"}
+                      </strong>
                       <span>{appointment.customerName || "Customer"}</span>
                       {appointment.staffName && (
                         <span>With {appointment.staffName}</span>
@@ -331,7 +342,9 @@ function AdminDashboardPage() {
           <article className="admin-dashboard__stat admin-dashboard__stat--total">
             <p>Total appointments</p>
             <strong>
-              {statusCounts.pending !== undefined ? totalCount : appointments.length}
+              {statusCounts.pending !== undefined
+                ? totalCount
+                : appointments.length}
             </strong>
             <span>Across all appointment statuses</span>
           </article>

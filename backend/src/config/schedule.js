@@ -8,7 +8,7 @@ export const salonSchedule = {
     .filter((value) => Number.isInteger(value)),
   maximumDaysAhead: Number(process.env.SALON_MAX_DAYS_AHEAD || 30),
   minimumNoticeHours: Number(process.env.SALON_MIN_NOTICE_HOURS || 2),
-  timezone: process.env.SALON_TIMEZONE || "UTC",
+  timezone: process.env.SALON_TIMEZONE || "Asia/Manila",
 };
 
 export const reminderWindowHours = {

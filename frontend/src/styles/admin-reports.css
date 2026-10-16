@@ -1,0 +1,28 @@
+.admin-reports-page { background: #f2f6f1; }
+.admin-reports__period {
+  display: flex; align-items: end; flex-wrap: wrap; gap: 14px 18px;
+  padding: 22px 0; border-bottom: 1px solid rgba(32, 86, 56, .16);
+}
+.admin-reports__period label { display: grid; gap: 6px; color: #52695a; font-size: 12px; font-weight: 700; }
+.admin-reports__period input { min-height: 40px; padding: 0 10px; border: 1px solid rgba(32, 86, 56, .25); background: #fff; color: #183d2c; font: inherit; }
+.admin-reports__period p { margin: 0 0 10px; color: #718175; font-size: 12px; }
+.admin-reports__hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .75fr); gap: 24px; margin: 24px 0 18px; padding: 28px; border-left: 5px solid #205638; background: #fff; box-shadow: 0 10px 26px rgba(24, 61, 44, .045); }
+.admin-reports__hero .customer-eyebrow { margin: 0 0 10px; color: #627d61; font-size: 12px; font-weight: 700; }
+.admin-reports__hero > div:first-child strong { color: #183d2c; font-family: "Newsreader", Georgia, serif; font-size: clamp(58px, 8vw, 86px); font-weight: 600; line-height: .9; }
+.admin-reports__status-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 22px; align-content: center; }
+.admin-reports__status-list div { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 7px; border-bottom: 1px solid rgba(32, 86, 56, .12); color: #52695a; font-size: 12px; }
+.admin-reports__status-list strong { color: #183d2c; }
+.admin-reports__grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 18px; }
+.admin-reports__table { border-top: 1px solid rgba(32, 86, 56, .14); }
+.admin-reports__row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid rgba(32, 86, 56, .12); }
+.admin-reports__row div { display: grid; gap: 4px; min-width: 0; }
+.admin-reports__row strong { color: #183d2c; font-size: 13px; }
+.admin-reports__row span { color: #718175; font-size: 11px; }
+.admin-reports__row > strong { flex: 0 0 auto; }
+.admin-reports__customer-count { color: #52695a; font-size: 14px; line-height: 1.6; }
+.admin-reports__customer-count strong { color: #205638; font-family: "Newsreader", Georgia, serif; font-size: 38px; font-weight: 600; }
+.admin-reports__loading { margin-top: 24px; color: #52695a; }
+@media (max-width: 760px) {
+  .admin-reports__hero, .admin-reports__grid { grid-template-columns: 1fr; }
+  .admin-reports__hero { padding: 22px; }
+}

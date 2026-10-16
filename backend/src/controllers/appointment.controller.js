@@ -101,6 +101,34 @@ const formatTime = (minutes) => {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 };
 
+const getSalonClock = (value = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: salonSchedule.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(value)
+    .reduce((result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    }, {});
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute),
+  };
+};
+
+const dateDifferenceInDays = (from, to) =>
+  Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+      86400000,
+  );
+
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const filtersForAppointmentType = (type, today, currentTime) => {
@@ -169,14 +197,11 @@ const getAvailabilityForService = async ({
   }
 
   const localDate = normalizeDateValue(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const lastDate = new Date(today);
-  lastDate.setDate(
-    lastDate.getDate() + Number(salonSchedule.maximumDaysAhead || 30),
-  );
+  const salonNow = getSalonClock();
+  const maximumDaysAhead = Number(salonSchedule.maximumDaysAhead || 30);
+  const daysFromToday = dateDifferenceInDays(salonNow.date, date);
 
-  if (localDate < today || localDate > lastDate) {
+  if (daysFromToday < 0 || daysFromToday > maximumDaysAhead) {
     return {
       date,
       slots: [],
@@ -202,6 +227,10 @@ const getAvailabilityForService = async ({
   const endMinutes = parseTime(salonSchedule.closingTime);
   const duration = Number(service.durationMinutes || 60);
   const interval = Number(salonSchedule.slotIntervalMinutes || 30);
+  const noticeMinutes = Number(salonSchedule.minimumNoticeHours || 2) * 60;
+  const noticeClock = getSalonClock(
+    new Date(Date.now() + noticeMinutes * 60 * 1000),
+  );
   const slots = [];
 
   for (
@@ -210,12 +239,9 @@ const getAvailabilityForService = async ({
     start += interval
   ) {
     const end = start + duration;
-    const slotDateTime = new Date(`${date}T${formatTime(start)}:00Z`);
-    const now = new Date();
-    const afterNotice =
-      slotDateTime.getTime() >=
-      now.getTime() +
-        Number(salonSchedule.minimumNoticeHours || 2) * 60 * 60 * 1000;
+    const slotIsAfterNotice =
+      date > noticeClock.date ||
+      (date === noticeClock.date && start >= noticeClock.minutes);
     const collision = existingAppointments.some((appointment) =>
       overlaps(
         start,
@@ -229,7 +255,7 @@ const getAvailabilityForService = async ({
     );
     const reason = dayIsClosed
       ? "Closed"
-      : !afterNotice
+      : !slotIsAfterNotice
         ? "Minimum notice required"
         : collision
           ? "Booked"
@@ -317,11 +343,9 @@ export const listAppointments = async (req, res, next) => {
       });
     }
 
-    const now = new Date();
-    const today = new Date(
-      Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
-    );
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const salonNow = getSalonClock();
+    const today = normalizeDateValue(salonNow.date);
+    const currentTime = formatTime(salonNow.minutes);
     const commonFilters = [...filters];
     filters.push(...filtersForAppointmentType(type, today, currentTime));
 

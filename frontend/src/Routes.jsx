@@ -15,6 +15,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import AdminSchedulePage from "./pages/AdminSchedulePage.jsx";
 import AdminServicesPage from "./pages/AdminServicesPage.jsx";
 import AdminFeedbackPage from "./pages/AdminFeedbackPage.jsx";
+import AdminReportsPage from "./pages/AdminReportsPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -49,6 +50,7 @@ function Routes() {
       children: [
         { path: "/admin/services", element: <AdminServicesPage /> },
         { path: "/admin/feedback", element: <AdminFeedbackPage /> },
+        { path: "/admin/reports", element: <AdminReportsPage /> },
       ],
     },
   ]);
