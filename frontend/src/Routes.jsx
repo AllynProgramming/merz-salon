@@ -17,6 +17,8 @@ import AdminServicesPage from "./pages/AdminServicesPage.jsx";
 import AdminFeedbackPage from "./pages/AdminFeedbackPage.jsx";
 import AdminReportsPage from "./pages/AdminReportsPage.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx";
+import StaffServicesPage from "./pages/StaffServicesPage.jsx";
+import StaffBookingPage from "./pages/StaffBookingPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -44,6 +46,8 @@ function Routes() {
       children: [
         { path: "/admin", element: <AdminDashboardPage /> },
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
+        { path: "/staff/services", element: <StaffServicesPage /> },
+        { path: "/staff/book-appointment", element: <StaffBookingPage /> },
       ],
     },
     {

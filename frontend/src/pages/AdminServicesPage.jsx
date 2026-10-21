@@ -6,7 +6,7 @@ import { formatPrice } from "../components/booking/bookingUtils.js";
 import {
   createService,
   getAdminServices,
-  removeService,
+  archiveService,
   restoreService,
   updateService,
 } from "../services/bookingApi.js";
@@ -116,24 +116,32 @@ function AdminServicesPage() {
     }
   };
 
-  const remove = async (service) => {
-    if (!window.confirm(`Remove "${service.name}" from the service menu?`)) {
+  const archive = async (service) => {
+    const confirmed = window.confirm(
+      `Archive "${service.name}"? It will no longer be available for booking.`,
+    );
+    if (!confirmed) {
       return;
     }
 
     setError("");
     setNotice("");
     try {
-      const { service: removedService } = await removeService(service._id, token);
+      const { service: archivedService } = await archiveService(
+        service._id,
+        token,
+      );
       setServices((current) =>
         current.map((item) =>
-          item._id === removedService._id ? removedService : item,
+          item._id === archivedService._id ? archivedService : item,
         ),
       );
       if (editingId === service._id) cancelEdit();
-      setNotice(`${service.name} was removed from the service menu.`);
+      setNotice(
+        `${service.name} was archived and is no longer available for booking.`,
+      );
     } catch (requestError) {
-      setError(requestError.message || "Could not remove this service.");
+      setError(requestError.message || "Could not archive this service.");
     }
   };
 
@@ -286,7 +294,7 @@ function AdminServicesPage() {
             <div className="admin-services__list">
               {services.map((service) => (
                 <article
-                  className={`admin-services__item${service.isActive ? "" : " is-removed"}`}
+                  className={`admin-services__item${service.isActive ? "" : " is-archived"}`}
                   key={service._id}
                 >
                   <div className="admin-services__details">
@@ -295,7 +303,7 @@ function AdminServicesPage() {
                       <span
                         className={`admin-services__status${service.isActive ? " is-active" : ""}`}
                       >
-                        {service.isActive ? "Active" : "Removed"}
+                        {service.isActive ? "Active" : "Archived"}
                       </span>
                     </div>
                     <p>
@@ -314,11 +322,11 @@ function AdminServicesPage() {
                     </button>
                     {service.isActive ? (
                       <button
-                        className="customer-button admin-services__remove"
+                        className="customer-button admin-services__archive"
                         type="button"
-                        onClick={() => remove(service)}
+                        onClick={() => archive(service)}
                       >
-                        Remove
+                        Archive
                       </button>
                     ) : (
                       <button

@@ -220,17 +220,64 @@ export async function updateService(serviceId, service, token) {
   });
 }
 
-export async function removeService(serviceId, token) {
-  return request(`/api/services/${encodeURIComponent(serviceId)}`, {
-    method: "DELETE",
-    token,
-  });
+export async function archiveService(serviceId, token) {
+  return request(
+    `/api/services/${encodeURIComponent(serviceId)}/archive`,
+    {
+      method: "PATCH",
+      token,
+    },
+  );
 }
 
 export async function restoreService(serviceId, token) {
   return request(
     `/api/services/${encodeURIComponent(serviceId)}/restore`,
     { method: "PATCH", token },
+  );
+}
+
+export async function searchBookingCustomers(search, token) {
+  const params = new URLSearchParams({ search });
+  const payload = await request(
+    `/api/staff/appointments/customers?${params}`,
+    { token },
+  );
+  return payload.customers || [];
+}
+
+export async function getStaffAvailability({
+  serviceId,
+  date,
+  excludeAppointmentId = "",
+  token,
+}) {
+  const params = new URLSearchParams({ serviceId, date });
+  if (excludeAppointmentId) {
+    params.set("excludeAppointmentId", excludeAppointmentId);
+  }
+  return request(`/api/staff/appointments/availability?${params}`, { token });
+}
+
+export async function createStaffAppointment(details, token) {
+  return request("/api/staff/appointments", {
+    method: "POST",
+    token,
+    body: JSON.stringify(details),
+  });
+}
+
+export async function rescheduleStaffAppointment(
+  appointmentId,
+  { date, startTime, token },
+) {
+  return request(
+    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+    {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ date, startTime }),
+    },
   );
 }
 

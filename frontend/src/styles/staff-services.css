@@ -1,0 +1,42 @@
+.staff-services__header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.staff-services__header .customer-button {
+  flex: 0 0 auto;
+  border-color: #205638;
+  background: #205638;
+  color: #fff;
+}
+
+.staff-services__header .customer-button:hover:not(:disabled) {
+  border-color: #173f2b;
+  background: #173f2b;
+  color: #fff;
+}
+
+.staff-services__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.staff-services__grid .booking-service-description {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.staff-services__duration-label {
+  color: #718175;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .staff-services__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

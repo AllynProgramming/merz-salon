@@ -165,6 +165,18 @@ function AdminDashboardPage() {
           <div className="admin-dashboard__heading-actions">
             <Link
               className="customer-button customer-button-outline admin-dashboard__manage"
+              to="/staff/services"
+            >
+              View Services
+            </Link>
+            <Link
+              className="customer-button customer-button-outline admin-dashboard__manage"
+              to="/staff/book-appointment"
+            >
+              Book for Customer
+            </Link>
+            <Link
+              className="customer-button customer-button-outline admin-dashboard__manage"
               to="/admin/schedule"
             >
               Manage Schedule

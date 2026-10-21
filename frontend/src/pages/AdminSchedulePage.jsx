@@ -3,8 +3,10 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
+import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
+import "../styles/staff-reschedule.css";
 
 function dateKey(date) {
   const year = date.getFullYear();
@@ -131,6 +133,7 @@ function AdminSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [reschedulingAppointment, setReschedulingAppointment] = useState(null);
   const [assigningId, setAssigningId] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [staff, setStaff] = useState([]);
@@ -285,6 +288,11 @@ function AdminSchedulePage() {
     } finally {
       setBusyId("");
     }
+  };
+
+  const finishReschedule = () => {
+    setReschedulingAppointment(null);
+    setRefreshVersion((version) => version + 1);
   };
 
   const assignStaff = async (appointmentId, staffId) => {
@@ -667,6 +675,19 @@ function AdminSchedulePage() {
                               </div>
                               <div className="admin-schedule__appointment-actions">
                                 <StatusBadge status={appointment.status} />
+                                {["pending", "confirmed"].includes(
+                                  appointment.status,
+                                ) && (
+                                  <button
+                                    type="button"
+                                    className="customer-button customer-button-outline admin-schedule__reschedule"
+                                    onClick={() =>
+                                      setReschedulingAppointment(appointment)
+                                    }
+                                  >
+                                    Reschedule
+                                  </button>
+                                )}
                                 {user?.role === "admin" && (
                                   <select
                                     className="admin-schedule__assign-select"
@@ -766,6 +787,19 @@ function AdminSchedulePage() {
                     </div>
                     <div className="admin-schedule__appointment-actions">
                       <StatusBadge status={appointment.status} />
+                      {["pending", "confirmed"].includes(
+                        appointment.status,
+                      ) && (
+                        <button
+                          type="button"
+                          className="customer-button customer-button-outline admin-schedule__reschedule"
+                          onClick={() =>
+                            setReschedulingAppointment(appointment)
+                          }
+                        >
+                          Reschedule
+                        </button>
+                      )}
                       {user?.role === "admin" && (
                         <select
                           className="admin-schedule__assign-select"
@@ -809,6 +843,14 @@ function AdminSchedulePage() {
           )}
         </section>
       </main>
+      {reschedulingAppointment && (
+        <StaffRescheduleDialog
+          appointment={reschedulingAppointment}
+          token={token}
+          onClose={() => setReschedulingAppointment(null)}
+          onRescheduled={finishReschedule}
+        />
+      )}
     </div>
   );
 }

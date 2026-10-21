@@ -94,7 +94,7 @@
   border-bottom: 1px solid rgba(32, 86, 56, 0.12);
 }
 
-.admin-services__item.is-removed .admin-services__details {
+.admin-services__item.is-archived .admin-services__details {
   opacity: 0.68;
 }
 
@@ -136,13 +136,13 @@
   color: #205638;
 }
 
-.admin-services__remove {
+.admin-services__archive {
   border: 1px solid #a33f37;
   background: #fff;
   color: #8a2f29;
 }
 
-.admin-services__remove:hover:not(:disabled) {
+.admin-services__archive:hover:not(:disabled) {
   background: #fff3f1;
   color: #74251f;
 }
