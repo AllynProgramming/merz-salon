@@ -532,6 +532,16 @@
   line-height: 1;
 }
 
+.admin-schedule__month-nav svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .admin-schedule__month-nav:hover,
 .admin-schedule__month-nav:focus-visible {
   border-color: #205638;

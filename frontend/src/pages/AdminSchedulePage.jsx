@@ -110,7 +110,7 @@ function workingHoursForStaff(member) {
 
 async function fetchStaff(token) {
   const response = await fetch("/api/admin/staff", {
-    Authorization: ["Bearer", token].join(" "),
+    headers: { Authorization: ["Bearer", token].join(" ") },
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -405,11 +405,11 @@ function AdminSchedulePage() {
               <div>
                 <h2 id="admin-schedule-hours-heading">Staff working hours</h2>
                 <p>
-                  Set each team memberâ€™s weekly availability before assigning
+                  Set each team member's weekly availability before assigning
                   appointments.
                 </p>
               </div>
-              {staffLoading && <span role="status">Loading staffâ€¦</span>}
+              {staffLoading && <span role="status">Loading staff...</span>}
             </div>
             {staff.length === 0 && !staffLoading ? (
               <p className="customer-empty-state">
@@ -492,7 +492,7 @@ function AdminSchedulePage() {
                   type="submit"
                   disabled={savingHours || !selectedStaffId}
                 >
-                  {savingHours ? "Saving hoursâ€¦" : "Save working hours"}
+                  {savingHours ? "Saving hours..." : "Save working hours"}
                 </button>
               </form>
             )}
@@ -514,7 +514,13 @@ function AdminSchedulePage() {
                     viewMode === "month" ? changeMonth(-1) : changeWeek(-1)
                   }
                 >
-                  â€¹
+                  <svg
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
+                  </svg>
                 </button>
                 <button
                   type="button"
@@ -531,7 +537,13 @@ function AdminSchedulePage() {
                     viewMode === "month" ? changeMonth(1) : changeWeek(1)
                   }
                 >
-                  â€º
+                  <svg
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />
+                  </svg>
                 </button>
                 <div
                   className="admin-schedule__view-toggle"
