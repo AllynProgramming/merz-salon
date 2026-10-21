@@ -1,7 +1,24 @@
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import Appointment from "../models/appointment.model.js";
 import User from "../models/user.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
+
+const createStaffSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    email: z.string().trim().email().max(254),
+    phone: z.string().trim().min(7).max(30),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters.")
+      .max(128)
+      .regex(
+        /^(?=.*[A-Za-z])(?=.*\d).+$/,
+        "Password must include at least one letter and one number.",
+      ),
+  })
+  .strict();
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 const workingHoursSchema = z
@@ -31,6 +48,60 @@ const workingHoursSchema = z
   );
 
 const staffIdPattern = /^[a-f\d]{24}$/i;
+
+export const createStaff = async (req, res, next) => {
+  const validation = createStaffSchema.safeParse(req.body);
+  if (!validation.success) {
+    return res.status(400).json({
+      message: validation.error.issues[0]?.message || "Invalid staff account.",
+    });
+  }
+
+  const { name, phone, password } = validation.data;
+  const email = validation.data.email.toLowerCase();
+  const [firstname, ...lastname] = name.split(/\s+/);
+
+  try {
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phone }, { phoneNumber: phone }],
+    });
+    if (existingUser) {
+      return res.status(409).json({
+        message: "An account with this email or phone number already exists.",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const staff = await User.create({
+      name,
+      firstname,
+      lastname: lastname.join(" "),
+      email,
+      phone,
+      phoneNumber: phone,
+      password: hashedPassword,
+      role: "staff",
+    });
+
+    return res.status(201).json({
+      message: "Staff account created.",
+      staff: {
+        _id: staff._id,
+        name: staff.name,
+        email: staff.email,
+        phone: staff.phone,
+        workingHours: staff.workingHours || [],
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "An account with this email or phone number already exists.",
+      });
+    }
+    return next(error);
+  }
+};
 
 export const listStaff = async (req, res, next) => {
   try {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  createStaff,
   listStaff,
   updateStaffWorkingHours,
 } from "../controllers/admin-staff.controller.js";
@@ -9,6 +10,7 @@ const router = Router();
 
 router.use(protect, requireAdmin);
 router.get("/staff", listStaff);
+router.post("/staff", createStaff);
 router.put("/staff/:id/working-hours", updateStaffWorkingHours);
 
 export default router;
