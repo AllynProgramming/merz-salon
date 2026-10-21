@@ -78,6 +78,21 @@ const createAppointmentSchema = z
   })
   .strict();
 
+const createStaffAppointmentSchema = z
+  .object({
+    customerId: z.string().regex(objectIdPattern, "Choose a valid customer."),
+    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
+    date: z.string().refine(isValidDateOnly, "Select a valid date."),
+    startTime: z.string().regex(timePattern, "Choose a valid time."),
+  })
+  .strict();
+
+const staffCustomerSearchSchema = z
+  .object({
+    search: z.string().trim().min(2).max(80),
+  })
+  .strict();
+
 const rescheduleSchema = z
   .object({
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
@@ -130,6 +145,47 @@ const dateDifferenceInDays = (from, to) =>
   );
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const searchBookingCustomers = async (req, res, next) => {
+  const validation = staffCustomerSearchSchema.safeParse(req.query);
+  if (!validation.success) {
+    return res.status(400).json({
+      message: "Enter at least 2 characters to search customers.",
+    });
+  }
+
+  try {
+    const pattern = new RegExp(escapeRegex(validation.data.search), "i");
+    const customers = await User.find({
+      role: "customer",
+      $or: [
+        { name: pattern },
+        { firstname: pattern },
+        { lastname: pattern },
+        { email: pattern },
+        { phone: pattern },
+        { phoneNumber: pattern },
+      ],
+    })
+      .select("name firstname lastname email phone phoneNumber")
+      .sort({ name: 1 })
+      .limit(10)
+      .lean();
+
+    return res.status(200).json({
+      customers: customers.map((customer) => ({
+        _id: customer._id,
+        name:
+          customer.name ||
+          [customer.firstname, customer.lastname].filter(Boolean).join(" "),
+        email: customer.email,
+        phone: customer.phone || customer.phoneNumber || "",
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 const filtersForAppointmentType = (type, today, currentTime) => {
   if (type === "upcoming") {
@@ -713,6 +769,82 @@ export const getAvailability = async (req, res, next) => {
   }
 };
 
+export const createStaffAppointment = async (req, res, next) => {
+  const validation = createStaffAppointmentSchema.safeParse(req.body);
+  if (!validation.success) {
+    return res.status(400).json({
+      message:
+        validation.error.issues[0]?.message || "Invalid appointment details.",
+    });
+  }
+
+  try {
+    const { customerId, serviceId, date, startTime } = validation.data;
+    const [customer, service] = await Promise.all([
+      User.findOne({ _id: customerId, role: "customer" }).select("_id"),
+      Service.findOne({ _id: serviceId, isActive: true }),
+    ]);
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer account not found." });
+    }
+    if (!service) {
+      return res.status(404).json({ message: "Choose an available service." });
+    }
+
+    const appointmentDate = normalizeDateValue(date);
+    const endTime = formatTime(
+      parseTime(startTime) + Number(service.durationMinutes || 60),
+    );
+    await ensureSlotIsAvailable({ serviceId, date, startTime });
+
+    const bookingReference = `MERZ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const appointment = new Appointment({
+      customer: customer._id,
+      service: service._id,
+      date: appointmentDate,
+      bookingReference,
+      startTime,
+      endTime,
+      priceSnapshot: Number(service.price),
+      durationMinutes: Number(service.durationMinutes),
+      status: APPOINTMENT_STATUS.PENDING,
+    });
+    appointment.statusHistory.push({
+      status: APPOINTMENT_STATUS.PENDING,
+      changedBy: String(req.user.id),
+      note: "Salon staff booked this appointment for the customer.",
+      changedAt: new Date(),
+    });
+    await appointment.save();
+
+    await createAppointmentNotifications({
+      appointment,
+      type: "booking_pending",
+      title: "Appointment booked by salon staff",
+      message: `Your ${service.name} appointment for ${date} at ${startTime} is waiting for staff confirmation.`,
+    });
+
+    return res.status(201).json({
+      message: "Appointment booked for the customer.",
+      appointment: {
+        _id: appointment._id,
+        service: { _id: service._id, name: service.name },
+        serviceName: service.name,
+        servicePrice: service.price,
+        durationMinutes: service.durationMinutes,
+        date: appointment.date,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        status: appointment.status,
+        bookingReference: appointment.bookingReference,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const createAppointment = async (req, res, next) => {
   const validation = createAppointmentSchema.safeParse(req.body);
   if (!validation.success) {
@@ -938,6 +1070,101 @@ export const rescheduleAppointment = async (req, res, next) => {
     changeAppointmentStatus(appointment, appointment.status, {
       changedBy: "customer",
       note: "Appointment time was rescheduled.",
+      allowSameStatus: true,
+    });
+    await appointment.save();
+
+    await createAppointmentNotifications({
+      appointment,
+      type: "rescheduled",
+      title: "Appointment updated",
+      message: `Your ${appointment.service.name} appointment has been rescheduled to ${date} at ${startTime}.`,
+    });
+
+    return res.status(200).json({
+      message: "Appointment rescheduled.",
+      appointment: {
+        _id: appointment._id,
+        serviceName: appointment.service.name,
+        date: appointment.date,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        status: appointment.status,
+        bookingReference: appointment.bookingReference,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const rescheduleStaffAppointment = async (req, res, next) => {
+  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
+  if (!validation.success) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  const bodyValidation = rescheduleSchema.safeParse(req.body);
+  if (!bodyValidation.success) {
+    return res.status(400).json({
+      message:
+        bodyValidation.error.issues[0]?.message ||
+        "Invalid reschedule request.",
+    });
+  }
+
+  try {
+    const { date, startTime } = bodyValidation.data;
+    const appointment = await Appointment.findById(req.params.id).populate(
+      "service",
+      "name durationMinutes price",
+    );
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+
+    if (
+      ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(
+        appointment.status,
+      )
+    ) {
+      return res.status(400).json({
+        message: "This appointment can no longer be rescheduled.",
+      });
+    }
+
+    if (
+      appointment.date.toISOString().slice(0, 10) === date &&
+      appointment.startTime === startTime
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Choose a different date or time." });
+    }
+
+    if (!appointment.service) {
+      return res.status(409).json({
+        message: "The service for this appointment is no longer available.",
+      });
+    }
+
+    await ensureSlotIsAvailable({
+      serviceId: String(appointment.service._id),
+      date,
+      startTime,
+      excludeAppointmentId: appointment._id,
+    });
+
+    appointment.date = normalizeDateValue(date);
+    appointment.startTime = startTime;
+    appointment.endTime = formatTime(
+      parseTime(startTime) +
+        Number(appointment.service.durationMinutes || 60),
+    );
+    changeAppointmentStatus(appointment, appointment.status, {
+      changedBy: String(req.user.id),
+      note: "Salon staff rescheduled the appointment.",
       allowSameStatus: true,
     });
     await appointment.save();
