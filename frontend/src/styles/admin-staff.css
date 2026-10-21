@@ -7,13 +7,6 @@
   padding-top: clamp(38px, 6vw, 72px);
 }
 
-.admin-staff__heading {
-  align-items: center;
-  padding-bottom: 28px;
-  border-bottom: 1px solid rgba(32, 86, 56, 0.2);
-}
-
-.admin-staff__heading > .customer-button-outline,
 .admin-staff__submit {
   flex: 0 0 auto;
   border-color: #205638;
@@ -21,22 +14,10 @@
   color: #fff;
 }
 
-.admin-staff__heading > .customer-button-outline:hover:not(:disabled),
 .admin-staff__submit:hover:not(:disabled) {
   border-color: #173f2b;
   background: #173f2b;
   color: #fff;
-}
-
-.admin-staff__heading h1 {
-  font-size: clamp(40px, 5.6vw, 62px);
-  letter-spacing: -0.035em;
-}
-
-.admin-staff__heading .customer-lede {
-  max-width: 52ch;
-  font-size: 15px;
-  line-height: 1.6;
 }
 
 .admin-staff__layout {

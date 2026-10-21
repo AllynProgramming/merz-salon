@@ -375,14 +375,14 @@ function AdminSchedulePage() {
   return (
     <div className="customer-page salon-landing admin-schedule-page">
       <Helmet>
-        <title>Admin Schedule | MERZ Beauty Salon</title>
+        <title>Manage Schedule | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="customer-container admin-dashboard">
-        <header className="customer-page-heading admin-dashboard__heading">
+        <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Schedule management</p>
-            <h1>Admin Schedule</h1>
+            <h1>Manage Schedule</h1>
             <p className="customer-lede">Appointments arranged by date and time.</p>
           </div>
           <Link className="customer-button customer-button-outline" to="/admin">

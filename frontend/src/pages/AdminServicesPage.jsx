@@ -11,6 +11,7 @@ import {
   updateService,
 } from "../services/bookingApi.js";
 import "../styles/customer.css";
+import "../styles/admin-dashboard.css";
 import "../styles/admin-services.css";
 
 const emptyForm = {
@@ -162,7 +163,7 @@ function AdminServicesPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="customer-container admin-services">
-        <header className="customer-page-heading admin-services__heading">
+        <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
             <h1>Manage Services</h1>

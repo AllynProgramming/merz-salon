@@ -7,36 +7,6 @@
   padding-top: clamp(38px, 6vw, 72px);
 }
 
-.admin-services__heading {
-  align-items: center;
-  padding-bottom: 28px;
-  border-bottom: 1px solid rgba(32, 86, 56, 0.2);
-}
-
-.admin-services__heading > .customer-button-outline {
-  flex: 0 0 auto;
-  border-color: #205638;
-  background: #205638;
-  color: #fff;
-}
-
-.admin-services__heading > .customer-button-outline:hover:not(:disabled) {
-  border-color: #173f2b;
-  background: #173f2b;
-  color: #fff;
-}
-
-.admin-services__heading h1 {
-  font-size: clamp(40px, 5.6vw, 62px);
-  letter-spacing: -0.035em;
-}
-
-.admin-services__heading .customer-lede {
-  max-width: 52ch;
-  font-size: 15px;
-  line-height: 1.6;
-}
-
 .admin-services__form-panel,
 .admin-services__list-panel {
   margin-top: 26px;
@@ -185,12 +155,6 @@
 }
 
 @media (max-width: 640px) {
-  .admin-services__heading {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 18px;
-  }
-
   .admin-services__form {
     grid-template-columns: 1fr;
   }

@@ -71,7 +71,7 @@ function AdminReportsPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="customer-container admin-dashboard">
-        <header className="customer-page-heading admin-dashboard__heading">
+        <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
             <h1>Reports</h1>

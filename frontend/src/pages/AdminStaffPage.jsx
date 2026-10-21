@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
+import "../styles/admin-dashboard.css";
 import "../styles/admin-staff.css";
 
 const emptyForm = {
@@ -111,7 +112,7 @@ function AdminStaffPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="customer-container admin-staff">
-        <header className="customer-page-heading admin-staff__heading">
+        <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
             <h1>Staff accounts</h1>
