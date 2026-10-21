@@ -130,7 +130,7 @@ export const updateService = async (req, res, next) => {
   }
 };
 
-export const removeService = async (req, res, next) => {
+export const archiveService = async (req, res, next) => {
   if (!validateServiceId(req.params.id, res)) return;
 
   try {
@@ -143,7 +143,7 @@ export const removeService = async (req, res, next) => {
       return res.status(404).json({ message: "Active service not found." });
     }
 
-    return res.status(200).json({ message: "Service removed.", service });
+    return res.status(200).json({ message: "Service archived.", service });
   } catch (error) {
     return next(error);
   }
@@ -159,7 +159,7 @@ export const restoreService = async (req, res, next) => {
       { new: true, runValidators: true },
     );
     if (!service) {
-      return res.status(404).json({ message: "Removed service not found." });
+      return res.status(404).json({ message: "Archived service not found." });
     }
 
     return res.status(200).json({ message: "Service restored.", service });
