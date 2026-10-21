@@ -145,14 +145,18 @@ function AdminDashboardPage() {
   return (
     <div className="customer-page salon-landing admin-dashboard-page">
       <Helmet>
-        <title>Admin Dashboard | MERZ Beauty Salon</title>
+        <title>
+          {`${user?.role === "admin" ? "Admin Dashboard" : "Staff Dashboard"} | MERZ Beauty Salon`}
+        </title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-dashboard__heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
-            <h1>Admin Dashboard</h1>
+            <h1>
+              {user?.role === "admin" ? "Admin Dashboard" : "Staff Dashboard"}
+            </h1>
             <p className="customer-lede">
               Welcome back, {user?.name || user?.firstname || "Team member"}.
               Here’s the latest appointment overview.
@@ -165,6 +169,14 @@ function AdminDashboardPage() {
             >
               Manage Schedule
             </Link>
+            {user?.role === "admin" && (
+              <Link
+                className="customer-button customer-button-outline admin-dashboard__manage"
+                to="/admin/staff"
+              >
+                Staff Accounts
+              </Link>
+            )}
             {user?.role === "admin" && (
               <Link
                 className="customer-button customer-button-outline admin-dashboard__manage"
