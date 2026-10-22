@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import { cancelStaffAppointment } from "../services/bookingApi.js";
+import { formatPrice } from "../components/booking/bookingUtils.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
 import "../styles/customer.css";
@@ -83,6 +84,21 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
+function AppointmentMeta({ appointment, id }) {
+  return (
+    <dl className="admin-schedule__appointment-meta" id={id}>
+      <div>
+        <dt>Price</dt>
+        <dd>{formatPrice(appointment.price)}</dd>
+      </div>
+      <div>
+        <dt>Booking reference</dt>
+        <dd>{appointment.bookingReference || appointment._id}</dd>
+      </div>
+    </dl>
+  );
+}
+
 const weekdayNames = [
   "Sunday",
   "Monday",
@@ -135,6 +151,7 @@ function AdminSchedulePage() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
   const [busyAction, setBusyAction] = useState("");
+  const [detailsAppointmentId, setDetailsAppointmentId] = useState("");
   const [reschedulingAppointment, setReschedulingAppointment] = useState(null);
   const [assigningId, setAssigningId] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -419,9 +436,14 @@ function AdminSchedulePage() {
             <h1>Manage Schedule</h1>
             <p className="customer-lede">Appointments arranged by date and time.</p>
           </div>
-          <Link className="customer-button customer-button-outline" to="/admin">
-            Back to dashboard
-          </Link>
+          <div className="admin-schedule__heading-actions">
+            <Link
+              className="customer-button customer-button-outline"
+              to="/admin"
+            >
+              Back to dashboard
+            </Link>
+          </div>
         </header>
 
         {["staff", "admin"].includes(user?.role) && (
@@ -705,11 +727,30 @@ function AdminSchedulePage() {
                                   {appointment.customerName || "Customer"}
                                 </span>
                                 {appointment.staffName && (
-                                  <span>With {appointment.staffName}</span>
+                                  <span>Staff: {appointment.staffName}</span>
                                 )}
                               </div>
                               <div className="admin-schedule__appointment-actions">
                                 <StatusBadge status={appointment.status} />
+                                <button
+                                  type="button"
+                                  className="customer-button customer-button-outline admin-schedule__details-toggle"
+                                  aria-expanded={
+                                    detailsAppointmentId === appointment._id
+                                  }
+                                  aria-controls={`appointment-meta-${appointment._id}`}
+                                  onClick={() =>
+                                    setDetailsAppointmentId((currentId) =>
+                                      currentId === appointment._id
+                                        ? ""
+                                        : appointment._id,
+                                    )
+                                  }
+                                >
+                                  {detailsAppointmentId === appointment._id
+                                    ? "Hide details"
+                                    : "Details"}
+                                </button>
                                 {appointment.canStaffCancel && (
                                   <button
                                     type="button"
@@ -785,6 +826,12 @@ function AdminSchedulePage() {
                                   </button>
                                 )}
                               </div>
+                              {detailsAppointmentId === appointment._id && (
+                                <AppointmentMeta
+                                  appointment={appointment}
+                                  id={`appointment-meta-${appointment._id}`}
+                                />
+                              )}
                             </article>
                           ))}
                         </div>
@@ -834,11 +881,30 @@ function AdminSchedulePage() {
                       <strong>{appointment.serviceName || "Salon service"}</strong>
                       <span>{appointment.customerName || "Customer"}</span>
                       {appointment.staffName && (
-                        <span>With {appointment.staffName}</span>
+                        <span>Staff: {appointment.staffName}</span>
                       )}
                     </div>
                     <div className="admin-schedule__appointment-actions">
                       <StatusBadge status={appointment.status} />
+                      <button
+                        type="button"
+                        className="customer-button customer-button-outline admin-schedule__details-toggle"
+                        aria-expanded={
+                          detailsAppointmentId === appointment._id
+                        }
+                        aria-controls={`appointment-meta-${appointment._id}`}
+                        onClick={() =>
+                          setDetailsAppointmentId((currentId) =>
+                            currentId === appointment._id
+                              ? ""
+                              : appointment._id,
+                          )
+                        }
+                      >
+                        {detailsAppointmentId === appointment._id
+                          ? "Hide details"
+                          : "Details"}
+                      </button>
                       {["pending", "confirmed"].includes(
                         appointment.status,
                       ) && (
@@ -908,6 +974,12 @@ function AdminSchedulePage() {
                         </button>
                       )}
                     </div>
+                    {detailsAppointmentId === appointment._id && (
+                      <AppointmentMeta
+                        appointment={appointment}
+                        id={`appointment-meta-${appointment._id}`}
+                      />
+                    )}
                   </article>
                 ))}
               </div>

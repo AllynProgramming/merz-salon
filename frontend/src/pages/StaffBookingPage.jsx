@@ -316,6 +316,12 @@ function StaffBookingPage() {
                   {result.endTime && `–${formatTime(result.endTime)}`}
                 </dd>
               </div>
+              {result.staffName && (
+                <div>
+                  <dt>Staff</dt>
+                  <dd>{result.staffName}</dd>
+                </div>
+              )}
               <div>
                 <dt>Booking reference</dt>
                 <dd>{result.bookingReference}</dd>

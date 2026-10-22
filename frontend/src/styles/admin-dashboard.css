@@ -97,6 +97,183 @@
   white-space: nowrap;
 }
 
+.staff-notification {
+  position: relative;
+  min-width: 0;
+}
+
+.staff-notification__trigger {
+  width: 100%;
+  min-height: 48px;
+  white-space: nowrap;
+}
+
+.staff-notification__trigger svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.staff-notification__count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #a33f37;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.staff-notification__panel {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 30;
+  width: min(360px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid rgba(32, 86, 56, 0.16);
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(24, 61, 44, 0.16);
+}
+
+.staff-notification__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(32, 86, 56, 0.12);
+}
+
+.staff-notification__header strong {
+  color: #183d2c;
+  font-size: 13px;
+}
+
+.staff-notification__header span,
+.staff-notification__item time {
+  color: #718175;
+  font-size: 11px;
+}
+
+.staff-notification__list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.staff-notification__list li + li {
+  border-top: 1px solid rgba(32, 86, 56, 0.1);
+}
+
+.staff-notification__item {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: 12px 15px;
+  border: 0;
+  background: #fff;
+  color: #52695a;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.staff-notification__item.is-unread {
+  background: #f2f7f1;
+}
+
+.staff-notification__item:hover,
+.staff-notification__item:focus-visible {
+  background: #edf4ed;
+}
+
+.staff-notification__item strong {
+  color: #183d2c;
+  font-size: 12px;
+}
+
+.staff-notification__item span,
+.staff-notification__message {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.staff-notification__item time {
+  margin-top: 2px;
+}
+
+.staff-notification__message {
+  padding: 14px 15px;
+  margin: 0;
+  color: #52695a;
+}
+
+.staff-notification__message p {
+  margin: 0 0 8px;
+}
+
+.staff-notification__message button,
+.staff-notification__schedule-link {
+  border: 0;
+  background: transparent;
+  color: #205638;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.staff-notification__schedule-link {
+  width: 100%;
+  padding: 11px 15px;
+  border-top: 1px solid rgba(32, 86, 56, 0.12);
+  text-align: left;
+}
+
+.admin-schedule__heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-schedule__heading-actions > .customer-button {
+  min-width: 154px;
+  flex: 0 0 auto;
+  border-color: #205638;
+  background: #205638;
+  color: #fff;
+}
+
+.admin-schedule__heading-actions > .customer-button:hover:not(:disabled) {
+  border-color: #173f2b;
+  background: #173f2b;
+  color: #fff;
+}
+
+.admin-schedule__heading-actions .staff-notification__trigger {
+  width: auto;
+  border-color: rgba(32, 86, 56, 0.24);
+  background: #fff;
+  color: #205638;
+}
+
+.admin-schedule__heading-actions .staff-notification__trigger:hover {
+  background: #edf4ed;
+}
+
 .admin-dashboard__heading .customer-eyebrow {
   display: flex;
   align-items: center;
@@ -906,20 +1083,124 @@
   gap: 8px;
 }
 
-.admin-schedule__cancel {
-  border-color: rgba(163, 63, 55, 0.35);
-  background: #fff6f4;
+.admin-schedule__appointment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 12px 28px;
+  margin: 4px 0 0;
+  padding: 11px 14px;
+  border-left: 3px solid #b9934c;
+  background: #f5f7f1;
+}
+
+.admin-schedule__appointment-meta div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-schedule__appointment-meta dt {
+  color: #718175;
+  font-size: 10px;
+}
+
+.admin-schedule__appointment-meta dd {
+  margin: 0;
+  color: #183d2c;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.admin-schedule-page .admin-schedule__appointment-actions .customer-button {
+  min-height: 38px;
+  gap: 7px;
+  padding: 0 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(24, 61, 44, 0.06);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.admin-schedule-page
+  .admin-schedule__appointment-actions
+  .customer-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(24, 61, 44, 0.12);
+}
+
+.admin-schedule-page
+  .admin-schedule__appointment-actions
+  .customer-button-primary {
+  border-color: #205638;
+  border-radius: 6px;
+  background: #205638;
+  color: #fff;
+}
+
+.admin-schedule-page
+  .admin-schedule__appointment-actions
+  .customer-button-primary:hover:not(:disabled) {
+  border-color: #173f2b;
+  background: #173f2b;
+}
+
+.admin-schedule-page .admin-schedule__reschedule {
+  border-color: rgba(32, 86, 56, 0.25);
+  background: #fff;
+  color: #205638;
+}
+
+.admin-schedule-page
+  .admin-schedule__reschedule:hover:not(:disabled) {
+  border-color: #205638;
+  background: #edf4ed;
+}
+
+.admin-schedule-page .admin-schedule__cancel {
+  border-color: rgba(163, 63, 55, 0.3);
+  background: #fff8f6;
   color: #8b302b;
 }
 
-.admin-schedule__cancel:hover:not(:disabled) {
+.admin-schedule-page
+  .admin-schedule__cancel:hover:not(:disabled) {
   border-color: #a33f37;
   background: #a33f37;
   color: #fff;
 }
 
-.admin-schedule__cancel:focus-visible {
-  outline: 2px solid #a33f37;
+.admin-schedule-page
+  .admin-schedule__appointment-actions
+  .customer-button-primary::before {
+  content: "✓";
+}
+
+.admin-schedule-page .admin-schedule__reschedule::before {
+  content: "↻";
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.admin-schedule-page .admin-schedule__cancel::before {
+  content: "×";
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.admin-schedule-page
+  .admin-schedule__appointment-actions
+  .customer-button:focus-visible {
+  outline: 3px solid #d1ad3b;
   outline-offset: 2px;
 }
 
@@ -1058,6 +1339,11 @@
 
   .admin-section-heading > .customer-button-outline {
     justify-self: start;
+  }
+
+  .admin-schedule__heading-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .admin-schedule__calendar-header {

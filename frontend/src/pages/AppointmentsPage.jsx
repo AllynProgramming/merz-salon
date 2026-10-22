@@ -357,6 +357,12 @@ function AppointmentsPage() {
                           {appointment.bookingReference || appointment._id}
                         </dd>
                       </div>
+                      {appointment.staffName && (
+                        <div>
+                          <dt>Staff</dt>
+                          <dd>{appointment.staffName}</dd>
+                        </div>
+                      )}
                       {appointment.hasFeedback && (
                         <div>
                           <dt>Your rating</dt>

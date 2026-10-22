@@ -10,6 +10,36 @@ import useAuth from "../context/useAuth.js";
 import { getAppointment } from "../services/bookingApi.js";
 import "../styles/booking.css";
 
+const appointmentStatusCopy = {
+  pending: {
+    eyebrow: "Appointment request received",
+    title: "Your appointment is pending",
+    description:
+      "Your request is waiting for staff confirmation. Keep this reference handy and contact the salon if you’re running late.",
+  },
+  confirmed: {
+    eyebrow: "Booking confirmed",
+    title: "Your appointment is confirmed",
+    description:
+      "Your booking is confirmed. Keep this reference handy and review your appointment details below.",
+  },
+  completed: {
+    eyebrow: "Appointment complete",
+    title: "Your appointment is completed",
+    description: "Review your appointment details below.",
+  },
+  cancelled: {
+    eyebrow: "Appointment update",
+    title: "Your appointment is cancelled",
+    description: "Review your appointment details below for the latest update.",
+  },
+  expired: {
+    eyebrow: "Appointment update",
+    title: "Your appointment has expired",
+    description: "Review your appointment details below for the latest update.",
+  },
+};
+
 function BookingConfirmationPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -21,25 +51,57 @@ function BookingConfirmationPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (appointment) return undefined;
     let active = true;
-    getAppointment(id, token)
-      .then((result) => {
-        if (active) setAppointment(result.appointment || result);
-      })
-      .catch((requestError) => {
-        if (active)
+
+    const refreshAppointment = async () => {
+      try {
+        const result = await getAppointment(id, token);
+        if (active) {
+          setAppointment(result.appointment || result);
+          setError("");
+        }
+      } catch (requestError) {
+        if (active) {
           setError(
             requestError.message || "We couldn't load this confirmation.",
           );
-      })
-      .finally(() => {
+        }
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    };
+
+    refreshAppointment();
     return () => {
       active = false;
     };
-  }, [appointment, id, token]);
+  }, [id, token]);
+
+  useEffect(() => {
+    if (appointment?.status !== "pending") return undefined;
+
+    let active = true;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const result = await getAppointment(id, token);
+        if (active) {
+          setAppointment(result.appointment || result);
+          setError("");
+        }
+      } catch (requestError) {
+        if (active) {
+          setError(
+            requestError.message || "We couldn't refresh your appointment.",
+          );
+        }
+      }
+    }, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [appointment?.status, id, token]);
 
   const service = appointment
     ? {
@@ -52,6 +114,12 @@ function BookingConfirmationPage() {
           appointment.durationMinutes ?? appointment.service?.durationMinutes,
       }
     : null;
+  const statusCopy =
+    appointmentStatusCopy[appointment?.status] || {
+      eyebrow: "Appointment update",
+      title: "Your appointment details",
+      description: "Review your appointment details below for the latest update.",
+    };
 
   return (
     <div className="booking-page salon-landing">
@@ -69,7 +137,7 @@ function BookingConfirmationPage() {
           <div className="booking-state" role="status" aria-busy="true">
             Loading your confirmation...
           </div>
-        ) : error ? (
+        ) : error && !appointment ? (
           <div className="booking-state booking-state-error" role="alert">
             <span>{error}</span>
             <Link to="/dashboard">Go to Dashboard</Link>
@@ -80,15 +148,17 @@ function BookingConfirmationPage() {
               className="booking-confirmation"
               aria-labelledby="confirmation-title"
             >
+              {error && (
+                <div className="booking-form-error" role="status">
+                  {error} Your saved booking details are still shown below.
+                </div>
+              )}
               <span className="booking-confirmation-mark" aria-hidden="true">
                 ✓
               </span>
-              <p className="booking-eyebrow">Appointment request received</p>
-              <h1 id="confirmation-title">Your appointment is pending</h1>
-              <p className="booking-lede">
-                Keep this reference handy. Your request stays pending while
-                staff confirms it. If you’re running late, contact the salon.
-              </p>
+              <p className="booking-eyebrow">{statusCopy.eyebrow}</p>
+              <h1 id="confirmation-title">{statusCopy.title}</h1>
+              <p className="booking-lede">{statusCopy.description}</p>
               <BookingSummary
                 service={service}
                 date={appointment.date}
@@ -96,6 +166,17 @@ function BookingConfirmationPage() {
                 endTime={appointment.endTime}
                 status={appointment.status}
               />
+              {appointment.staffName && (
+                <p className="booking-assigned-staff">
+                  Staff: <strong>{appointment.staffName}</strong>
+                </p>
+              )}
+              <p className="booking-reference">
+                Booking reference:{" "}
+                <strong>
+                  {appointment.bookingReference || appointment._id}
+                </strong>
+              </p>
               <div className="booking-confirmation-actions">
                 <Link
                   className="booking-button booking-button-primary"

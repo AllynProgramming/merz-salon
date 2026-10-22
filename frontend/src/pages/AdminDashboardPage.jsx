@@ -302,7 +302,7 @@ function AdminDashboardPage() {
                       </strong>
                       <span>{appointment.customerName || "Customer"}</span>
                       {appointment.staffName && (
-                        <span>With {appointment.staffName}</span>
+                        <span>Staff: {appointment.staffName}</span>
                       )}
                     </div>
                     <StatusBadge status={appointment.status} />

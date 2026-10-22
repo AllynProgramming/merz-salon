@@ -767,6 +767,20 @@
   overflow-wrap: anywhere;
 }
 
+.booking-page .booking-assigned-staff {
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-left: 3px solid #b9934c;
+  background: #f5f7f1;
+  color: #52695a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.booking-page .booking-assigned-staff strong {
+  color: #183d2c;
+}
+
 .booking-page .booking-comparison {
   display: grid;
   grid-template-columns: 1fr 1fr;

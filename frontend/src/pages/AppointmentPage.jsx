@@ -209,6 +209,11 @@ function AppointmentPage() {
                   endTime={appointment.endTime}
                   status={appointment.status}
                 />
+                {appointment.staffName && (
+                  <p className="booking-assigned-staff">
+                    Staff: <strong>{appointment.staffName}</strong>
+                  </p>
+                )}
                 <p className="booking-reference">
                   Reference: {appointment.bookingReference || appointment._id}
                 </p>

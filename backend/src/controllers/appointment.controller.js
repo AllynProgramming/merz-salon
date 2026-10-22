@@ -11,6 +11,7 @@ import {
   changeAppointmentStatus,
 } from "../utils/appointmentStatus.js";
 import {
+  createStaffAssignmentNotification,
   createAppointmentNotifications,
   syncReminderState,
 } from "../services/notification.service.js";
@@ -18,6 +19,10 @@ import {
   getSalonClock,
   hasPassedConfirmationDeadline,
 } from "../utils/salonTime.js";
+import {
+  withBookingDateLock,
+  withBookingDateLocks,
+} from "../utils/bookingLock.js";
 
 const isValidDateOnly = (value) => {
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -28,6 +33,14 @@ const isValidDateOnly = (value) => {
 const objectIdPattern = /^[a-f\d]{24}$/i;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 const appointmentStatuses = Object.values(APPOINTMENT_STATUS);
+
+const notifyStaffOfAssignment = async (details) => {
+  try {
+    await createStaffAssignmentNotification(details);
+  } catch (error) {
+    console.error("Failed to create staff assignment notification:", error);
+  }
+};
 
 const appointmentQuerySchema = z
   .object({
@@ -134,6 +147,11 @@ const formatTime = (minutes) => {
   const mins = minutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 };
+
+const getStaffDisplayName = (staff) =>
+  staff?.name ||
+  [staff?.firstname, staff?.lastname].filter(Boolean).join(" ") ||
+  null;
 
 const dateDifferenceInDays = (from, to) =>
   Math.round(
@@ -382,7 +400,10 @@ const getCalculatedAvailabilityForService = async ({
     Appointment.find(appointmentQuery)
       .select("startTime endTime staff")
       .lean(),
-    User.find({ role: "staff" }).select("workingHours").lean(),
+    User.find({ role: "staff" })
+      .select("workingHours")
+      .sort({ _id: 1 })
+      .lean(),
   ]);
 
   const calculatedSlots = getAvailabilitySlots({
@@ -580,13 +601,8 @@ export const listAppointments = async (req, res, next) => {
           staffId: appointment.staff?._id
             ? String(appointment.staff._id)
             : null,
-          staffName:
-            appointment.staff?.name ||
-            [appointment.staff?.firstname, appointment.staff?.lastname]
-            .filter(Boolean)
-            .join(" ") ||
-            null,
         }),
+        staffName: getStaffDisplayName(appointment.staff),
         service: appointment.service
           ? { _id: appointment.service._id, name: appointment.service.name }
           : null,
@@ -648,7 +664,10 @@ export const assignAppointmentStaff = async (req, res, next) => {
   }
 
   try {
-    const appointment = await Appointment.findById(req.params.id);
+    const appointment = await Appointment.findById(req.params.id).populate(
+      "service",
+      "name",
+    );
     if (!appointment) {
       return res.status(404).json({ message: "Appointment not found." });
     }
@@ -663,6 +682,7 @@ export const assignAppointmentStaff = async (req, res, next) => {
     }
 
     const { staffId } = bodyValidation.data;
+    const previousStaffId = appointment.staff ? String(appointment.staff) : "";
     if (!staffId) {
       appointment.staff = null;
       await appointment.save();
@@ -717,6 +737,13 @@ export const assignAppointmentStaff = async (req, res, next) => {
 
     appointment.staff = staff._id;
     await appointment.save();
+    if (previousStaffId !== String(staff._id)) {
+      await notifyStaffOfAssignment({
+        appointment,
+        staffId: staff._id,
+        serviceName: appointment.service?.name,
+      });
+    }
     const staffName =
       staff.name ||
       [staff.firstname, staff.lastname].filter(Boolean).join(" ") ||
@@ -743,6 +770,7 @@ export const getAppointmentById = async (req, res, next) => {
       customer: req.user.id,
     })
       .populate("service", "name price durationMinutes")
+      .populate("staff", "name firstname lastname")
       .lean();
 
     if (!appointment) {
@@ -795,6 +823,7 @@ export const getAppointmentById = async (req, res, next) => {
           "Salon service",
         servicePrice:
           appointment.priceSnapshot ?? appointment.service?.price ?? 0,
+        staffName: getStaffDisplayName(appointment.staff),
         durationMinutes:
           appointment.durationMinutes ??
           appointment.service?.durationMinutes ??
@@ -970,32 +999,39 @@ export const createStaffAppointment = async (req, res, next) => {
     const endTime = formatTime(
       parseTime(startTime) + Number(service.durationMinutes || 60),
     );
-    const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
-
     const bookingReference = `MERZ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    const appointment = new Appointment({
-      customer: customer._id,
-      service: service._id,
-      date: appointmentDate,
-      bookingReference,
-      startTime,
-      endTime,
-      priceSnapshot: Number(service.price),
-      durationMinutes: Number(service.durationMinutes),
-      status: APPOINTMENT_STATUS.PENDING,
-      staff: slot.staffId,
+    const appointment = await withBookingDateLock(date, async () => {
+      const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
+      const newAppointment = new Appointment({
+        customer: customer._id,
+        service: service._id,
+        date: appointmentDate,
+        bookingReference,
+        startTime,
+        endTime,
+        priceSnapshot: Number(service.price),
+        durationMinutes: Number(service.durationMinutes),
+        status: APPOINTMENT_STATUS.PENDING,
+        staff: slot.staffId,
+      });
+      newAppointment.statusHistory.push({
+        status: APPOINTMENT_STATUS.PENDING,
+        changedBy: String(req.user.id),
+        note: "Salon staff created this appointment.",
+        changedAt: new Date(),
+      });
+      changeAppointmentStatus(
+        newAppointment,
+        APPOINTMENT_STATUS.CONFIRMED,
+        {
+          changedBy: String(req.user.id),
+          note: "Salon staff booked and confirmed this appointment.",
+        },
+      );
+      await newAppointment.save();
+      return newAppointment;
     });
-    appointment.statusHistory.push({
-      status: APPOINTMENT_STATUS.PENDING,
-      changedBy: String(req.user.id),
-      note: "Salon staff created this appointment.",
-      changedAt: new Date(),
-    });
-    changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
-      changedBy: String(req.user.id),
-      note: "Salon staff booked and confirmed this appointment.",
-    });
-    await appointment.save();
+    await appointment.populate("staff", "name firstname lastname");
 
     await createAppointmentNotifications({
       appointment,
@@ -1003,6 +1039,15 @@ export const createStaffAppointment = async (req, res, next) => {
       title: "Appointment confirmed",
       message: `Your ${service.name} appointment for ${date} at ${startTime} has been confirmed by salon staff.`,
     });
+    if (
+      String(appointment.staff?._id || appointment.staff) !== String(req.user.id)
+    ) {
+      await notifyStaffOfAssignment({
+        appointment,
+        staffId: appointment.staff,
+        serviceName: service.name,
+      });
+    }
 
     return res.status(201).json({
       message: "Appointment booked and confirmed.",
@@ -1012,6 +1057,7 @@ export const createStaffAppointment = async (req, res, next) => {
         serviceName: service.name,
         servicePrice: service.price,
         durationMinutes: service.durationMinutes,
+        staffName: getStaffDisplayName(appointment.staff),
         date: appointment.date,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
@@ -1046,39 +1092,46 @@ export const createAppointment = async (req, res, next) => {
       appointmentStartMinutes + Number(service.durationMinutes || 60);
     const endTime = formatTime(endMinutes);
 
-    const slot = await ensureSlotIsAvailable({
-      serviceId,
-      date,
-      startTime,
-    });
-
     const bookingReference = `MERZ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
-    const appointment = new Appointment({
-      customer: req.user.id,
-      service: service._id,
-      date: appointmentDate,
-      bookingReference,
-      startTime,
-      endTime,
-      priceSnapshot: Number(service.price),
-      durationMinutes: Number(service.durationMinutes),
-      status: APPOINTMENT_STATUS.PENDING,
-      staff: slot.staffId,
+    const appointment = await withBookingDateLock(date, async () => {
+      const slot = await ensureSlotIsAvailable({
+        serviceId,
+        date,
+        startTime,
+      });
+      const newAppointment = new Appointment({
+        customer: req.user.id,
+        service: service._id,
+        date: appointmentDate,
+        bookingReference,
+        startTime,
+        endTime,
+        priceSnapshot: Number(service.price),
+        durationMinutes: Number(service.durationMinutes),
+        status: APPOINTMENT_STATUS.PENDING,
+        staff: slot.staffId,
+      });
+      newAppointment.statusHistory.push({
+        status: APPOINTMENT_STATUS.PENDING,
+        changedBy: "customer",
+        note: "Customer requested an appointment.",
+        changedAt: new Date(),
+      });
+      await newAppointment.save();
+      return newAppointment;
     });
-    appointment.statusHistory.push({
-      status: APPOINTMENT_STATUS.PENDING,
-      changedBy: "customer",
-      note: "Customer requested an appointment.",
-      changedAt: new Date(),
-    });
-    await appointment.save();
+    await appointment.populate("staff", "name firstname lastname");
 
     await createAppointmentNotifications({
       appointment,
       type: "booking_pending",
       title: "Appointment request received",
       message: `Your ${service.name} appointment request for ${date} at ${startTime} is waiting for staff confirmation.`,
+    });
+    await notifyStaffOfAssignment({
+      appointment,
+      staffId: appointment.staff,
+      serviceName: service.name,
     });
 
     return res.status(201).json({
@@ -1089,6 +1142,7 @@ export const createAppointment = async (req, res, next) => {
         serviceName: service.name,
         servicePrice: service.price,
         durationMinutes: service.durationMinutes,
+        staffName: getStaffDisplayName(appointment.staff),
         date: appointment.date,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
@@ -1348,27 +1402,46 @@ export const rescheduleAppointment = async (req, res, next) => {
         .json({ message: "Choose a different date or time." });
     }
 
-    const slot = await ensureSlotIsAvailable({
-      serviceId: String(appointment.service._id),
-      date,
-      startTime,
-      excludeAppointmentId: appointment._id,
-      preferredStaffId: appointment.staff ? String(appointment.staff) : "",
-    });
-
-    const nextEndTime = formatTime(
-      parseTime(startTime) + Number(appointment.service.durationMinutes || 60),
+    const previousStaffId = String(
+      appointment.staff?._id || appointment.staff || "",
     );
-    appointment.staff = slot.staffId;
-    appointment.date = normalizeDateValue(date);
-    appointment.startTime = startTime;
-    appointment.endTime = nextEndTime;
-    changeAppointmentStatus(appointment, appointment.status, {
-      changedBy: "customer",
-      note: "Appointment time was rescheduled.",
-      allowSameStatus: true,
-    });
-    await appointment.save();
+    let assignedStaffId = "";
+    await withBookingDateLocks(
+      [appointment.date, date],
+      async () => {
+        const slot = await ensureSlotIsAvailable({
+          serviceId: String(appointment.service._id),
+          date,
+          startTime,
+          excludeAppointmentId: appointment._id,
+          preferredStaffId: appointment.staff ? String(appointment.staff) : "",
+        });
+
+        assignedStaffId = String(slot.staffId);
+        const nextEndTime = formatTime(
+          parseTime(startTime) +
+            Number(appointment.service.durationMinutes || 60),
+        );
+        appointment.staff = slot.staffId;
+        appointment.date = normalizeDateValue(date);
+        appointment.startTime = startTime;
+        appointment.endTime = nextEndTime;
+        changeAppointmentStatus(appointment, appointment.status, {
+          changedBy: "customer",
+          note: "Appointment time was rescheduled.",
+          allowSameStatus: true,
+        });
+        await appointment.save();
+      },
+    );
+
+    if (previousStaffId !== assignedStaffId) {
+      await notifyStaffOfAssignment({
+        appointment,
+        staffId: assignedStaffId,
+        serviceName: appointment.service.name,
+      });
+    }
 
     await createAppointmentNotifications({
       appointment,
@@ -1445,27 +1518,45 @@ export const rescheduleStaffAppointment = async (req, res, next) => {
       });
     }
 
-    const slot = await ensureSlotIsAvailable({
-      serviceId: String(appointment.service._id),
-      date,
-      startTime,
-      excludeAppointmentId: appointment._id,
-      preferredStaffId: appointment.staff ? String(appointment.staff) : "",
-    });
-
-    appointment.staff = slot.staffId;
-    appointment.date = normalizeDateValue(date);
-    appointment.startTime = startTime;
-    appointment.endTime = formatTime(
-      parseTime(startTime) +
-        Number(appointment.service.durationMinutes || 60),
+    const previousStaffId = String(
+      appointment.staff?._id || appointment.staff || "",
     );
-    changeAppointmentStatus(appointment, appointment.status, {
-      changedBy: String(req.user.id),
-      note: "Salon staff rescheduled the appointment.",
-      allowSameStatus: true,
-    });
-    await appointment.save();
+    let assignedStaffId = "";
+    await withBookingDateLocks(
+      [appointment.date, date],
+      async () => {
+        const slot = await ensureSlotIsAvailable({
+          serviceId: String(appointment.service._id),
+          date,
+          startTime,
+          excludeAppointmentId: appointment._id,
+          preferredStaffId: appointment.staff ? String(appointment.staff) : "",
+        });
+
+        assignedStaffId = String(slot.staffId);
+        appointment.staff = slot.staffId;
+        appointment.date = normalizeDateValue(date);
+        appointment.startTime = startTime;
+        appointment.endTime = formatTime(
+          parseTime(startTime) +
+            Number(appointment.service.durationMinutes || 60),
+        );
+        changeAppointmentStatus(appointment, appointment.status, {
+          changedBy: String(req.user.id),
+          note: "Salon staff rescheduled the appointment.",
+          allowSameStatus: true,
+        });
+        await appointment.save();
+      },
+    );
+
+    if (previousStaffId !== assignedStaffId) {
+      await notifyStaffOfAssignment({
+        appointment,
+        staffId: assignedStaffId,
+        serviceName: appointment.service.name,
+      });
+    }
 
     await createAppointmentNotifications({
       appointment,

@@ -14,6 +14,7 @@ const notificationSchema = new mongoose.Schema(
         "booking_pending",
         "booking_confirmed",
         "booking_expired",
+        "booking_assigned",
         "rescheduled",
         "cancelled",
         "reminder",

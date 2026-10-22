@@ -89,6 +89,22 @@ export async function createAppointmentNotifications({
   });
 }
 
+export async function createStaffAssignmentNotification({
+  appointment,
+  staffId,
+  serviceName,
+}) {
+  if (!appointment || !staffId) return null;
+
+  return createNotification({
+    userId: staffId._id || staffId,
+    appointmentId: appointment._id,
+    type: "booking_assigned",
+    title: "Appointment assigned to you",
+    message: `You have been assigned a ${serviceName || "salon service"} appointment on ${new Date(appointment.date).toISOString().slice(0, 10)} at ${appointment.startTime}.`,
+  });
+}
+
 export async function syncReminderState(appointmentId, reminderType) {
   const appointment = await Appointment.findById(appointmentId);
   if (!appointment) return null;
