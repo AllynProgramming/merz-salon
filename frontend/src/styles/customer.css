@@ -276,6 +276,11 @@
   color: #76241d;
 }
 
+.customer-status-expired {
+  background: #f1edf5;
+  color: #5e4c73;
+}
+
 .customer-next-actions {
   display: flex;
   flex-wrap: wrap;

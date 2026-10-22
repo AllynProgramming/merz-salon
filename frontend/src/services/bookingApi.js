@@ -259,12 +259,45 @@ export async function getStaffAvailability({
   return request(`/api/staff/appointments/availability?${params}`, { token });
 }
 
+export async function getStaffAvailabilityCalendar({
+  serviceId,
+  from,
+  to,
+  token,
+}) {
+  const params = new URLSearchParams({ serviceId, from, to });
+  return request(
+    `/api/staff/appointments/availability/calendar?${params}`,
+    { token },
+  );
+}
+
 export async function createStaffAppointment(details, token) {
   return request("/api/staff/appointments", {
     method: "POST",
     token,
     body: JSON.stringify(details),
   });
+}
+
+export async function cancelStaffAppointment(appointmentId, token) {
+  return request(
+    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    {
+      method: "PATCH",
+      token,
+    },
+  );
+}
+
+export async function confirmStaffAppointment(appointmentId, token) {
+  return request(
+    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/confirm`,
+    {
+      method: "PATCH",
+      token,
+    },
+  );
 }
 
 export async function rescheduleStaffAppointment(
@@ -296,6 +329,40 @@ export async function getAvailability({
 
   await delay();
   return makeMockAvailability({ serviceId, date, excludeAppointmentId });
+}
+
+export async function getAvailabilityCalendar({ serviceId, from, to, token }) {
+  if (!USE_MOCK_APPOINTMENT_API) {
+    const params = new URLSearchParams({ serviceId, from, to });
+    return request(`/api/appointments/availability/calendar?${params}`, {
+      token,
+    });
+  }
+
+  await delay();
+  const days = [];
+  const cursor = toLocalDate(from);
+  const lastDate = toLocalDate(to);
+  while (cursor <= lastDate) {
+    const date = [
+      cursor.getFullYear(),
+      String(cursor.getMonth() + 1).padStart(2, "0"),
+      String(cursor.getDate()).padStart(2, "0"),
+    ].join("-");
+    const slots = makeMockAvailability({ serviceId, date }).slots;
+    const availableSlots = slots.filter((slot) => slot.available).length;
+    const reasons = [...new Set(slots.map((slot) => slot.reason).filter(Boolean))];
+    days.push({
+      date,
+      available: availableSlots > 0,
+      availableSlots,
+      ...(availableSlots === 0 && {
+        reason: reasons.length === 1 ? reasons[0] : "No available times",
+      }),
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { from, to, days };
 }
 
 export async function createAppointment({ serviceId, date, startTime, token }) {
@@ -636,7 +703,13 @@ export async function getDashboardOverview(token) {
   const customerAppointments = [...mockAppointments.values()].filter(
     (appointment) => appointment.owner === token,
   );
-  const statuses = ["pending", "confirmed", "completed", "cancelled"];
+  const statuses = [
+    "pending",
+    "confirmed",
+    "completed",
+    "cancelled",
+    "expired",
+  ];
   const counts = Object.fromEntries(
     statuses.map((status) => [
       status,

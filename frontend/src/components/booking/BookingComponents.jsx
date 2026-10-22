@@ -182,7 +182,7 @@ export function TimeSlotGrid({
           <i className="is-available" /> Available
         </span>
         <span>
-          <i className="is-unavailable" /> Booked or outside hours
+          <i className="is-unavailable" /> No staff available
         </span>
       </div>
       {groups.map((group) => {
@@ -271,6 +271,7 @@ export function StatusBadge({ status }) {
     "confirmed",
     "completed",
     "cancelled",
+    "expired",
   ].includes(status)
     ? status
     : "pending";
@@ -279,6 +280,7 @@ export function StatusBadge({ status }) {
     confirmed: "✓",
     completed: "✓",
     cancelled: "×",
+    expired: "!",
   }[normalizedStatus];
 
   return (

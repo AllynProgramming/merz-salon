@@ -9,7 +9,13 @@ function dateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function DatePicker({ value, onChange, serviceDuration = 30 }) {
+function DatePicker({
+  value,
+  onChange,
+  serviceDuration = 30,
+  availabilityByDate,
+  availabilityLoading = false,
+}) {
   const [viewMonth, setViewMonth] = useState(() => {
     const normalizedValue = toDateOnly(value);
     const selected = normalizedValue
@@ -32,7 +38,7 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
     Number(bookingSchedule.closingTime.slice(0, 2)) * 60 +
     Number(bookingSchedule.closingTime.slice(3));
 
-  const allowed = (date) => {
+  const isWithinBookingRules = (date) => {
     const day = new Date(date);
     day.setHours(0, 0, 0, 0);
     if (day < today || day > lastBookableDay) return false;
@@ -51,6 +57,17 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
     }
     return true;
   };
+  const allowed = (date) => {
+    const key = dateKey(date);
+    if (availabilityLoading) return false;
+    if (availabilityByDate !== undefined) {
+      return availabilityByDate[key]?.available === true;
+    }
+    return isWithinBookingRules(date);
+  };
+  const selectedAvailability = value
+    ? availabilityByDate?.[toDateOnly(value)]
+    : null;
 
   const firstWeekday = new Date(viewMonth).getDay();
   const start = new Date(
@@ -84,7 +101,12 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
   };
 
   return (
-    <div className="booking-calendar" aria-label="Choose appointment date">
+    <div
+      className={`booking-calendar${availabilityLoading ? " is-loading" : ""}`}
+      role="group"
+      aria-label="Choose appointment date"
+      aria-busy={availabilityLoading}
+    >
       <div className="booking-calendar-header">
         <button
           type="button"
@@ -136,14 +158,24 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
           const isCurrentMonth = day.getMonth() === viewMonth.getMonth();
           const isToday = key === dateKey(today);
           const isSelected = key === toDateOnly(value);
+          const dateAvailability = availabilityByDate?.[key];
+          const isUnavailable =
+            availabilityByDate !== undefined
+              ? dateAvailability?.available !== true
+              : !isWithinBookingRules(day);
           return (
             <button
-              className={`booking-calendar-day ${isCurrentMonth ? "" : "is-outside"} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
+              className={`booking-calendar-day ${isCurrentMonth ? "" : "is-outside"} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""} ${isUnavailable ? "is-unavailable" : ""}`}
               type="button"
               key={key}
               data-date={key}
               disabled={!allowed(day)}
-              aria-label={`${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(day)}${isToday ? ", today" : ""}${!allowed(day) ? ", unavailable" : ""}`}
+              title={
+                isUnavailable
+                  ? dateAvailability?.reason || "Unavailable"
+                  : undefined
+              }
+              aria-label={`${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(day)}${isToday ? ", today" : ""}${isUnavailable ? `, unavailable${dateAvailability?.reason ? `: ${dateAvailability.reason}` : ""}` : ""}`}
               aria-pressed={isSelected}
               tabIndex={isSelected || (!value && isToday) ? 0 : -1}
               onKeyDown={(event) => moveFocus(event, day)}
@@ -154,12 +186,21 @@ function DatePicker({ value, onChange, serviceDuration = 30 }) {
           );
         })}
       </div>
-      <p className="booking-calendar-note">
-        Closed Sundays · Book up to {bookingSchedule.maximumDaysAhead} days
-        ahead
+      <p className="booking-calendar-note" aria-live="polite">
+        {availabilityLoading
+          ? "Checking available dates…"
+          : "Crossed-out dates are unavailable and cannot be selected."}
       </p>
       <p className="booking-calendar-selection" aria-live="polite">
-        {value ? formatDate(value) : "Select an available date"}
+        {value
+          ? `${formatDate(value)}${
+              selectedAvailability
+                ? selectedAvailability.available
+                  ? ` · ${selectedAvailability.availableSlots} available times`
+                  : ` · Unavailable${selectedAvailability.reason ? `: ${selectedAvailability.reason}` : ""}`
+                : ""
+            }`
+          : "Select an available date"}
       </p>
     </div>
   );

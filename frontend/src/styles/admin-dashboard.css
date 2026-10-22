@@ -342,6 +342,10 @@
   background: #a33f37;
 }
 
+.admin-dashboard__stat--expired::before {
+  background: #79618f;
+}
+
 .admin-dashboard__stat p {
   margin: 0 0 9px;
   color: #52695a;
@@ -432,6 +436,13 @@
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-schedule__staff-note {
+  margin: -12px 0 20px;
+  color: #627d61;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .admin-dashboard-page .customer-alert-error {
@@ -864,10 +875,28 @@
 
 .admin-schedule__appointment-actions {
   display: flex;
+  flex-wrap: wrap;
   grid-column: 2;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
+}
+
+.admin-schedule__cancel {
+  border-color: rgba(163, 63, 55, 0.35);
+  background: #fff6f4;
+  color: #8b302b;
+}
+
+.admin-schedule__cancel:hover:not(:disabled) {
+  border-color: #a33f37;
+  background: #a33f37;
+  color: #fff;
+}
+
+.admin-schedule__cancel:focus-visible {
+  outline: 2px solid #a33f37;
+  outline-offset: 2px;
 }
 
 .admin-feedback-page {

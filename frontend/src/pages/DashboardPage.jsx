@@ -13,7 +13,13 @@ import {
 } from "../services/bookingApi.js";
 import "../styles/customer.css";
 
-const statuses = ["pending", "confirmed", "completed", "cancelled"];
+const statuses = [
+  "pending",
+  "confirmed",
+  "completed",
+  "cancelled",
+  "expired",
+];
 
 function DashboardIcon({ name }) {
   const paths = {
@@ -44,6 +50,12 @@ function DashboardIcon({ name }) {
       <>
         <circle cx="12" cy="12" r="9" />
         <path d="m9 9 6 6m0-6-6 6" />
+      </>
+    ),
+    expired: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5m0 3h.01" />
       </>
     ),
   };

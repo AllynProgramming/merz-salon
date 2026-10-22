@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
+import { cancelStaffAppointment } from "../services/bookingApi.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
 import "../styles/customer.css";
@@ -133,6 +134,7 @@ function AdminSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [busyAction, setBusyAction] = useState("");
   const [reschedulingAppointment, setReschedulingAppointment] = useState(null);
   const [assigningId, setAssigningId] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -268,6 +270,7 @@ function AdminSchedulePage() {
   const confirmAppointment = async (appointmentId) => {
     if (!appointmentId) return;
     setBusyId(appointmentId);
+    setBusyAction("confirm");
     setError("");
 
     try {
@@ -287,6 +290,29 @@ function AdminSchedulePage() {
       setError(requestError.message || "Could not confirm this appointment.");
     } finally {
       setBusyId("");
+      setBusyAction("");
+    }
+  };
+
+  const cancelAppointment = async (appointmentId) => {
+    if (
+      !appointmentId ||
+      !window.confirm("Cancel this appointment? The customer will be notified.")
+    ) {
+      return;
+    }
+    setBusyId(appointmentId);
+    setBusyAction("cancel");
+    setError("");
+
+    try {
+      await cancelStaffAppointment(appointmentId, token);
+      setRefreshVersion((version) => version + 1);
+    } catch (requestError) {
+      setError(requestError.message || "Could not cancel this appointment.");
+    } finally {
+      setBusyId("");
+      setBusyAction("");
     }
   };
 
@@ -397,6 +423,15 @@ function AdminSchedulePage() {
             Back to dashboard
           </Link>
         </header>
+
+        {["staff", "admin"].includes(user?.role) && (
+          <p className="admin-schedule__staff-note">
+            You can cancel pending or confirmed appointments before their
+            scheduled start time. Pending bookings stay held briefly after
+            their start while you confirm them. Customers are notified when you
+            cancel.
+          </p>
+        )}
 
         {error && (
           <div className="customer-alert customer-alert-error" role="alert">
@@ -675,9 +710,7 @@ function AdminSchedulePage() {
                               </div>
                               <div className="admin-schedule__appointment-actions">
                                 <StatusBadge status={appointment.status} />
-                                {["pending", "confirmed"].includes(
-                                  appointment.status,
-                                ) && (
+                                {appointment.canStaffCancel && (
                                   <button
                                     type="button"
                                     className="customer-button customer-button-outline admin-schedule__reschedule"
@@ -718,7 +751,10 @@ function AdminSchedulePage() {
                                     ))}
                                   </select>
                                 )}
-                                {appointment.status === "pending" && (
+                                {appointment.status === "pending" &&
+                                  (user?.role === "admin" ||
+                                    !appointment.staffId ||
+                                    appointment.staffId === user?._id) && (
                                   <button
                                     type="button"
                                     className="customer-button customer-button-primary"
@@ -727,9 +763,25 @@ function AdminSchedulePage() {
                                     }
                                     disabled={busyId === appointment._id}
                                   >
-                                    {busyId === appointment._id
+                                    {busyId === appointment._id &&
+                                    busyAction === "confirm"
                                       ? "Confirming..."
                                       : "Confirm"}
+                                  </button>
+                                )}
+                                {appointment.canStaffCancel && (
+                                  <button
+                                    type="button"
+                                    className="customer-button customer-button-outline admin-schedule__cancel"
+                                    onClick={() =>
+                                      cancelAppointment(appointment._id)
+                                    }
+                                    disabled={busyId === appointment._id}
+                                  >
+                                    {busyId === appointment._id &&
+                                    busyAction === "cancel"
+                                      ? "Cancelling..."
+                                      : "Cancel"}
                                   </button>
                                 )}
                               </div>
@@ -824,14 +876,35 @@ function AdminSchedulePage() {
                           ))}
                         </select>
                       )}
-                      {appointment.status === "pending" && (
+                      {appointment.status === "pending" &&
+                        (user?.role === "admin" ||
+                          !appointment.staffId ||
+                          appointment.staffId === user?._id) && (
                         <button
                           type="button"
                           className="customer-button customer-button-primary"
                           onClick={() => confirmAppointment(appointment._id)}
                           disabled={busyId === appointment._id}
                         >
-                          {busyId === appointment._id ? "Confirming..." : "Confirm"}
+                          {busyId === appointment._id &&
+                          busyAction === "confirm"
+                            ? "Confirming..."
+                            : "Confirm"}
+                        </button>
+                      )}
+                      {["pending", "confirmed"].includes(
+                        appointment.status,
+                      ) && (
+                        <button
+                          type="button"
+                          className="customer-button customer-button-outline admin-schedule__cancel"
+                          onClick={() => cancelAppointment(appointment._id)}
+                          disabled={busyId === appointment._id}
+                        >
+                          {busyId === appointment._id &&
+                          busyAction === "cancel"
+                            ? "Cancelling..."
+                            : "Cancel"}
                         </button>
                       )}
                     </div>

@@ -270,6 +270,7 @@ function AdminDashboardPage() {
                   <option value="confirmed">Confirmed</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
+                  <option value="expired">Expired</option>
                 </select>
               </label>
             </div>
@@ -362,6 +363,11 @@ function AdminDashboardPage() {
             <p>Cancelled</p>
             <strong>{statusCounts.cancelled ?? 0}</strong>
             <span>Appointments no longer scheduled</span>
+          </article>
+          <article className="admin-dashboard__stat admin-dashboard__stat--expired">
+            <p>Expired</p>
+            <strong>{statusCounts.expired ?? 0}</strong>
+            <span>Pending requests not confirmed in time</span>
           </article>
           <article className="admin-dashboard__stat admin-dashboard__stat--total">
             <p>Total appointments</p>

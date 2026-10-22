@@ -21,6 +21,7 @@ const statusOptions = [
   { value: "confirmed", label: "Confirmed" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "expired", label: "Expired" },
 ];
 
 function formatDate(value) {

@@ -5,6 +5,7 @@ import {
   createAppointment,
   getAppointmentById,
   getAvailability,
+  getAvailabilityCalendar,
   listAppointments,
   rescheduleAppointment,
 } from "../controllers/appointment.controller.js";
@@ -14,6 +15,7 @@ import { getFeedbackForAppointment } from "../controllers/feedback.controller.js
 const router = Router();
 
 router.use(protect, requireCustomer);
+router.get("/availability/calendar", getAvailabilityCalendar);
 router.get("/availability", getAvailability);
 router.get("/", listAppointments);
 router.post("/", createAppointment);

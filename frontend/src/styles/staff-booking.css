@@ -27,6 +27,20 @@
   font-weight: 650;
 }
 
+.staff-booking__calendar-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(150, 48, 48, 0.2);
+  background: #fff6f4;
+  color: #873d36;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .staff-booking__field input,
 .staff-booking__field select {
   width: 100%;
@@ -128,17 +142,58 @@
 
 .staff-booking__slot {
   position: relative;
-  display: flex;
-  min-height: 44px;
-  align-items: center;
+  display: grid;
+  min-height: 54px;
+  align-content: center;
   justify-content: center;
-  padding: 9px 12px;
-  border: 1px solid rgba(32, 86, 56, 0.25);
-  background: #fff;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(32, 86, 56, 0.35);
+  background: #f2f7f1;
   color: #205638;
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.staff-booking__availability-note {
+  margin: -5px 0 8px;
+  color: #718175;
+  font-size: 12px;
+}
+
+.staff-booking__availability-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0 0 14px;
+  padding: 0;
+  color: #52695a;
+  font-size: 12px;
+  list-style: none;
+}
+
+.staff-booking__availability-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.staff-booking__availability-legend li > span {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(32, 86, 56, 0.45);
+  background: #fff;
+}
+
+.staff-booking__availability-legend li > .is-available {
+  border-color: #205638;
+  background: #f2f7f1;
+}
+
+.staff-booking__availability-legend li > .is-unavailable {
+  border-color: rgba(24, 61, 44, 0.1);
+  background: #f1f3f0;
 }
 
 .staff-booking__slot input {
@@ -155,6 +210,19 @@
   color: #fff;
   outline: 2px solid rgba(32, 86, 56, 0.22);
   outline-offset: 2px;
+}
+
+.staff-booking__slot.is-unavailable {
+  border-color: rgba(24, 61, 44, 0.1);
+  background: #f1f3f0;
+  color: #879087;
+  cursor: not-allowed;
+}
+
+.staff-booking__slot.is-unavailable small {
+  color: #7c857c;
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .staff-booking__no-slots {
@@ -183,8 +251,60 @@
   font-size: 13px;
 }
 
+.staff-booking__success-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.staff-booking__success-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #34734a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .staff-booking__success span {
   color: #52695a;
+}
+
+.staff-booking__success > p {
+  margin: 0;
+  color: #52695a;
+}
+
+.staff-booking__success > p strong {
+  color: #205638;
+}
+
+.staff-booking__confirmation-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 8px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(32, 86, 56, 0.16);
+}
+
+.staff-booking__confirmation-details > div {
+  display: grid;
+  gap: 3px;
+}
+
+.staff-booking__confirmation-details dt {
+  color: #718175;
+  font-size: 11px;
+}
+
+.staff-booking__confirmation-details dd {
+  margin: 0;
+  color: #183d2c;
+  font-weight: 650;
 }
 
 @media (max-width: 640px) {
@@ -199,5 +319,9 @@
 
   .staff-booking__submit button {
     width: 100%;
+  }
+
+  .staff-booking__confirmation-details {
+    grid-template-columns: 1fr;
   }
 }

@@ -6,11 +6,18 @@ import Service from "../models/service.model.js";
 import User from "../models/user.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
 import { salonSchedule } from "../config/schedule.js";
-import { changeAppointmentStatus } from "../utils/appointmentStatus.js";
+import {
+  buildStatusHistoryEntry,
+  changeAppointmentStatus,
+} from "../utils/appointmentStatus.js";
 import {
   createAppointmentNotifications,
   syncReminderState,
 } from "../services/notification.service.js";
+import {
+  getSalonClock,
+  hasPassedConfirmationDeadline,
+} from "../utils/salonTime.js";
 
 const isValidDateOnly = (value) => {
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -70,6 +77,18 @@ const availabilitySchema = z
   })
   .strict();
 
+const availabilityCalendarSchema = z
+  .object({
+    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
+    from: z.string().refine(isValidDateOnly, "Select a valid start date."),
+    to: z.string().refine(isValidDateOnly, "Select a valid end date."),
+  })
+  .strict()
+  .refine((range) => range.from <= range.to, {
+    message: "The end date must be on or after the start date.",
+    path: ["to"],
+  });
+
 const createAppointmentSchema = z
   .object({
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
@@ -116,33 +135,37 @@ const formatTime = (minutes) => {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 };
 
-const getSalonClock = (value = new Date()) => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: salonSchedule.timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  })
-    .formatToParts(value)
-    .reduce((result, part) => {
-      if (part.type !== "literal") result[part.type] = part.value;
-      return result;
-    }, {});
-
-  return {
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    minutes: Number(parts.hour) * 60 + Number(parts.minute),
-  };
-};
-
 const dateDifferenceInDays = (from, to) =>
   Math.round(
     (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
       86400000,
   );
+
+const expirePendingAppointment = async (appointment, appointmentDate) => {
+  const expiredAppointment = await Appointment.findOneAndUpdate(
+    { _id: appointment._id, status: APPOINTMENT_STATUS.PENDING },
+    {
+      $set: { status: APPOINTMENT_STATUS.EXPIRED },
+      $push: {
+        statusHistory: buildStatusHistoryEntry({
+          status: APPOINTMENT_STATUS.EXPIRED,
+          changedBy: "system",
+          note: `Booking expired because it was not confirmed within ${salonSchedule.appointmentConfirmationGraceMinutes} minutes after its scheduled start time.`,
+        }),
+      },
+    },
+    { new: true },
+  );
+  if (!expiredAppointment) return null;
+
+  await createAppointmentNotifications({
+    appointment: expiredAppointment,
+    type: "booking_expired",
+    title: "Appointment request expired",
+    message: `Your ${appointment.service?.name || "appointment"} request for ${appointmentDate} at ${appointment.startTime} expired because it was not confirmed within ${salonSchedule.appointmentConfirmationGraceMinutes} minutes after the scheduled start. Please book another time.`,
+  });
+  return expiredAppointment;
+};
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -236,48 +259,20 @@ const normalizeDateValue = (dateString) => {
 const overlaps = (start, end, otherStart, otherEnd) =>
   start < otherEnd && otherStart < end;
 
-const getAvailabilityForService = async ({
-  serviceId,
+const getAvailabilitySlots = ({
+  service,
   date,
-  excludeAppointmentId = "",
+  localDate,
+  staffMembers,
+  existingAppointments,
 }) => {
-  const service = await Service.findOne({
-    _id: serviceId,
-    isActive: true,
-  }).lean();
-
-  if (!service) {
-    throw Object.assign(new Error("Choose an available service."), {
-      status: 404,
-    });
-  }
-
-  const localDate = normalizeDateValue(date);
   const salonNow = getSalonClock();
   const maximumDaysAhead = Number(salonSchedule.maximumDaysAhead || 30);
   const daysFromToday = dateDifferenceInDays(salonNow.date, date);
 
   if (daysFromToday < 0 || daysFromToday > maximumDaysAhead) {
-    return {
-      date,
-      slots: [],
-      unavailable: true,
-    };
+    return [];
   }
-
-  const appointmentQuery = {
-    service: serviceId,
-    date: localDate,
-    status: { $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED] },
-  };
-
-  if (excludeAppointmentId) {
-    appointmentQuery._id = { $ne: excludeAppointmentId };
-  }
-
-  const existingAppointments = await Appointment.find(appointmentQuery)
-    .select("startTime endTime")
-    .lean();
 
   const startMinutes = parseTime(salonSchedule.openingTime);
   const endMinutes = parseTime(salonSchedule.closingTime);
@@ -298,34 +293,119 @@ const getAvailabilityForService = async ({
     const slotIsAfterNotice =
       date > noticeClock.date ||
       (date === noticeClock.date && start >= noticeClock.minutes);
-    const collision = existingAppointments.some((appointment) =>
-      overlaps(
-        start,
-        end,
-        parseTime(appointment.startTime),
-        parseTime(appointment.endTime),
-      ),
-    );
     const dayIsClosed = salonSchedule.closedWeekdays.includes(
       localDate.getUTCDay(),
     );
+    const overlappingAppointments = existingAppointments.filter(
+      (appointment) =>
+        overlaps(
+          start,
+          end,
+          parseTime(appointment.startTime),
+          parseTime(appointment.endTime),
+        ),
+    );
+    const busyStaffIds = new Set(
+      overlappingAppointments
+        .filter((appointment) => appointment.staff)
+        .map((appointment) => String(appointment.staff)),
+    );
+    const unassignedBookings = overlappingAppointments.filter(
+      (appointment) => !appointment.staff,
+    ).length;
+    const scheduledStaffIds = staffMembers
+      .filter((staff) => {
+        const workday = staff.workingHours?.find(
+          (hours) => hours.weekday === localDate.getUTCDay(),
+        );
+        return (
+          workday?.enabled &&
+          workday.startTime <= formatTime(start) &&
+          workday.endTime >= formatTime(end)
+        );
+      })
+      .map((staff) => String(staff._id));
+    const freeStaffIds = scheduledStaffIds.filter(
+      (staffId) => !busyStaffIds.has(staffId),
+    );
+    freeStaffIds.splice(0, unassignedBookings);
     const reason = dayIsClosed
       ? "Closed"
       : !slotIsAfterNotice
         ? "Minimum notice required"
-        : collision
-          ? "Booked"
-          : "";
+        : scheduledStaffIds.length === 0
+          ? "No staff scheduled"
+          : freeStaffIds.length === 0
+            ? "Staff fully booked"
+            : "";
 
     slots.push({
       startTime: formatTime(start),
       endTime: formatTime(end),
       available: !reason,
+      availableStaffCount: freeStaffIds.length,
+      availableStaffIds: freeStaffIds,
       ...(reason ? { reason } : {}),
     });
   }
 
-  return { date, slots };
+  return slots;
+};
+
+const getCalculatedAvailabilityForService = async ({
+  serviceId,
+  date,
+  excludeAppointmentId = "",
+}) => {
+  const service = await Service.findOne({
+    _id: serviceId,
+    isActive: true,
+  }).lean();
+
+  if (!service) {
+    throw Object.assign(new Error("Choose an available service."), {
+      status: 404,
+    });
+  }
+
+  const localDate = normalizeDateValue(date);
+  const appointmentQuery = {
+    date: localDate,
+    status: { $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED] },
+  };
+
+  if (excludeAppointmentId) {
+    appointmentQuery._id = { $ne: excludeAppointmentId };
+  }
+
+  const [existingAppointments, staffMembers] = await Promise.all([
+    Appointment.find(appointmentQuery)
+      .select("startTime endTime staff")
+      .lean(),
+    User.find({ role: "staff" }).select("workingHours").lean(),
+  ]);
+
+  const calculatedSlots = getAvailabilitySlots({
+    service,
+    date,
+    localDate,
+    staffMembers,
+    existingAppointments,
+  });
+  return {
+    date,
+    calculatedSlots,
+  };
+};
+
+const getAvailabilityForService = async (options) => {
+  const availability = await getCalculatedAvailabilityForService(options);
+  return {
+    date: availability.date,
+    slots: availability.calculatedSlots.map(
+      ({ availableStaffIds, ...slot }) => slot,
+    ),
+  };
 };
 
 const ensureSlotIsAvailable = async ({
@@ -333,23 +413,29 @@ const ensureSlotIsAvailable = async ({
   date,
   startTime,
   excludeAppointmentId = "",
+  preferredStaffId = "",
 }) => {
-  const availability = await getAvailabilityForService({
+  const availability = await getCalculatedAvailabilityForService({
     serviceId,
     date,
     excludeAppointmentId,
   });
 
-  const slot = availability.slots.find(
+  const slot = availability.calculatedSlots.find(
     (entry) => entry.startTime === startTime,
   );
-  if (!slot || !slot.available) {
+  const availableStaffId = slot?.availableStaffIds.includes(
+    String(preferredStaffId || ""),
+  )
+    ? preferredStaffId
+    : slot?.availableStaffIds[0];
+  if (!slot?.available || !availableStaffId) {
     throw Object.assign(new Error("That time is no longer available."), {
       status: 409,
     });
   }
 
-  return slot;
+  return { ...slot, staffId: availableStaffId };
 };
 
 export const listAppointments = async (req, res, next) => {
@@ -522,6 +608,16 @@ export const listAppointments = async (req, res, next) => {
           APPOINTMENT_STATUS.PENDING,
           APPOINTMENT_STATUS.CONFIRMED,
         ].includes(appointment.status),
+        ...(isStaffView && {
+          canStaffCancel:
+            [
+              APPOINTMENT_STATUS.PENDING,
+              APPOINTMENT_STATUS.CONFIRMED,
+            ].includes(appointment.status) &&
+            (appointment.date.toISOString().slice(0, 10) > salonNow.date ||
+              (appointment.date.toISOString().slice(0, 10) === salonNow.date &&
+                appointment.startTime > currentTime)),
+        }),
         hasFeedback: Boolean(feedback),
         rating: feedback?.rating ?? null,
       };
@@ -769,6 +865,84 @@ export const getAvailability = async (req, res, next) => {
   }
 };
 
+export const getAvailabilityCalendar = async (req, res, next) => {
+  const validation = availabilityCalendarSchema.safeParse(req.query);
+  if (!validation.success) {
+    return res.status(400).json({
+      message:
+        validation.error.issues[0]?.message ||
+        "Invalid availability calendar request.",
+    });
+  }
+
+  const { serviceId, from, to } = validation.data;
+  if (dateDifferenceInDays(from, to) > 92) {
+    return res.status(400).json({
+      message: "Choose a date range of 93 days or less.",
+    });
+  }
+
+  try {
+    const service = await Service.findOne({
+      _id: serviceId,
+      isActive: true,
+    }).lean();
+    if (!service) {
+      return res.status(404).json({ message: "Choose an available service." });
+    }
+
+    const fromDate = normalizeDateValue(from);
+    const toDate = normalizeDateValue(to);
+    const [appointments, staffMembers] = await Promise.all([
+      Appointment.find({
+        date: { $gte: fromDate, $lte: toDate },
+        status: {
+          $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED],
+        },
+      })
+        .select("date startTime endTime staff")
+        .lean(),
+      User.find({ role: "staff" }).select("workingHours").lean(),
+    ]);
+    const appointmentsByDate = new Map();
+
+    for (const appointment of appointments) {
+      const key = appointment.date.toISOString().slice(0, 10);
+      const dayAppointments = appointmentsByDate.get(key) || [];
+      dayAppointments.push(appointment);
+      appointmentsByDate.set(key, dayAppointments);
+    }
+
+    const days = [];
+    const cursor = new Date(fromDate);
+    while (cursor <= toDate) {
+      const date = cursor.toISOString().slice(0, 10);
+      const slots = getAvailabilitySlots({
+        service,
+        date,
+        localDate: new Date(cursor),
+        staffMembers,
+        existingAppointments: appointmentsByDate.get(date) || [],
+      });
+      const availableSlots = slots.filter((slot) => slot.available).length;
+      const reasons = [...new Set(slots.map((slot) => slot.reason).filter(Boolean))];
+      days.push({
+        date,
+        available: availableSlots > 0,
+        availableSlots,
+        ...(availableSlots === 0 && {
+          reason: reasons.length === 1 ? reasons[0] : "No available times",
+        }),
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return res.status(200).json({ from, to, days });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const createStaffAppointment = async (req, res, next) => {
   const validation = createStaffAppointmentSchema.safeParse(req.body);
   if (!validation.success) {
@@ -796,7 +970,7 @@ export const createStaffAppointment = async (req, res, next) => {
     const endTime = formatTime(
       parseTime(startTime) + Number(service.durationMinutes || 60),
     );
-    await ensureSlotIsAvailable({ serviceId, date, startTime });
+    const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
 
     const bookingReference = `MERZ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const appointment = new Appointment({
@@ -809,24 +983,29 @@ export const createStaffAppointment = async (req, res, next) => {
       priceSnapshot: Number(service.price),
       durationMinutes: Number(service.durationMinutes),
       status: APPOINTMENT_STATUS.PENDING,
+      staff: slot.staffId,
     });
     appointment.statusHistory.push({
       status: APPOINTMENT_STATUS.PENDING,
       changedBy: String(req.user.id),
-      note: "Salon staff booked this appointment for the customer.",
+      note: "Salon staff created this appointment.",
       changedAt: new Date(),
+    });
+    changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
+      changedBy: String(req.user.id),
+      note: "Salon staff booked and confirmed this appointment.",
     });
     await appointment.save();
 
     await createAppointmentNotifications({
       appointment,
-      type: "booking_pending",
-      title: "Appointment booked by salon staff",
-      message: `Your ${service.name} appointment for ${date} at ${startTime} is waiting for staff confirmation.`,
+      type: "booking_confirmed",
+      title: "Appointment confirmed",
+      message: `Your ${service.name} appointment for ${date} at ${startTime} has been confirmed by salon staff.`,
     });
 
     return res.status(201).json({
-      message: "Appointment booked for the customer.",
+      message: "Appointment booked and confirmed.",
       appointment: {
         _id: appointment._id,
         service: { _id: service._id, name: service.name },
@@ -885,6 +1064,7 @@ export const createAppointment = async (req, res, next) => {
       priceSnapshot: Number(service.price),
       durationMinutes: Number(service.durationMinutes),
       status: APPOINTMENT_STATUS.PENDING,
+      staff: slot.staffId,
     });
     appointment.statusHistory.push({
       status: APPOINTMENT_STATUS.PENDING,
@@ -943,6 +1123,21 @@ export const confirmAppointment = async (req, res, next) => {
       });
     }
 
+    const salonNow = getSalonClock();
+    const appointmentDate = appointment.date.toISOString().slice(0, 10);
+    if (
+      hasPassedConfirmationDeadline({
+        appointmentDate,
+        startTime: appointment.startTime,
+        salonNow,
+      })
+    ) {
+      await expirePendingAppointment(appointment, appointmentDate);
+      return res.status(409).json({
+        message: "This appointment has expired and can no longer be confirmed.",
+      });
+    }
+
     if (req.user.role === "staff") {
       if (
         appointment.staff &&
@@ -981,27 +1176,126 @@ export const confirmAppointment = async (req, res, next) => {
       }
     }
 
-    changeAppointmentStatus(appointment, APPOINTMENT_STATUS.CONFIRMED, {
-      changedBy: String(req.user.id),
-      note: "Staff confirmed the appointment.",
-    });
-    if (req.user.role === "staff") appointment.staff = req.user.id;
-    await appointment.save();
+    const confirmationClock = getSalonClock();
+    if (
+      hasPassedConfirmationDeadline({
+        appointmentDate,
+        startTime: appointment.startTime,
+        salonNow: confirmationClock,
+      })
+    ) {
+      await expirePendingAppointment(appointment, appointmentDate);
+      return res.status(409).json({
+        message: "This appointment has expired and can no longer be confirmed.",
+      });
+    }
+
+    const confirmationUpdate = {
+      status: APPOINTMENT_STATUS.CONFIRMED,
+      ...(req.user.role === "staff" && { staff: req.user.id }),
+    };
+    const confirmedAppointment = await Appointment.findOneAndUpdate(
+      { _id: appointment._id, status: APPOINTMENT_STATUS.PENDING },
+      {
+        $set: confirmationUpdate,
+        $push: {
+          statusHistory: buildStatusHistoryEntry({
+            status: APPOINTMENT_STATUS.CONFIRMED,
+            changedBy: String(req.user.id),
+            note: "Staff confirmed the appointment.",
+          }),
+        },
+      },
+      { new: true },
+    );
+    if (!confirmedAppointment) {
+      return res.status(409).json({
+        message: "This appointment is no longer pending confirmation.",
+      });
+    }
 
     await createAppointmentNotifications({
-      appointment,
+      appointment: confirmedAppointment,
       type: "booking_confirmed",
       title: "Appointment confirmed",
-      message: `Your ${appointment.service?.name || "appointment"} on ${appointment.date.toISOString().slice(0, 10)} at ${appointment.startTime} has been confirmed.`,
+      message: `Your ${appointment.service?.name || "appointment"} on ${appointmentDate} at ${appointment.startTime} has been confirmed.`,
     });
 
     return res.status(200).json({
       message: "Appointment confirmed.",
       appointment: {
-        _id: appointment._id,
-        status: appointment.status,
-        bookingReference: appointment.bookingReference,
-        statusHistory: appointment.statusHistory,
+        _id: confirmedAppointment._id,
+        status: confirmedAppointment.status,
+        bookingReference: confirmedAppointment.bookingReference,
+        statusHistory: confirmedAppointment.statusHistory,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const cancelStaffAppointment = async (req, res, next) => {
+  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
+  if (!validation.success) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  try {
+    const appointment = await Appointment.findById(req.params.id).populate(
+      "service",
+      "name",
+    );
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+
+    if (
+      ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(
+        appointment.status,
+      )
+    ) {
+      return res.status(400).json({
+        message: "This appointment can no longer be cancelled.",
+      });
+    }
+
+    const salonNow = getSalonClock();
+    const appointmentDate = appointment.date.toISOString().slice(0, 10);
+    if (
+      appointmentDate < salonNow.date ||
+      (appointmentDate === salonNow.date &&
+        parseTime(appointment.startTime) <= salonNow.minutes)
+    ) {
+      return res.status(400).json({
+        message: "Appointments can only be cancelled before their scheduled time.",
+      });
+    }
+
+    const updatedAppointment = changeAppointmentStatus(
+      appointment,
+      APPOINTMENT_STATUS.CANCELLED,
+      {
+        changedBy: String(req.user.id),
+        note: "Salon staff cancelled the appointment.",
+      },
+    );
+    await updatedAppointment.save();
+
+    await createAppointmentNotifications({
+      appointment: updatedAppointment,
+      type: "cancelled",
+      title: "Appointment cancelled",
+      message: `Your ${updatedAppointment.service?.name || "appointment"} booking has been cancelled by salon staff.`,
+    });
+
+    return res.status(200).json({
+      message: "Appointment cancelled.",
+      appointment: {
+        _id: updatedAppointment._id,
+        status: updatedAppointment.status,
+        cancelledAt: updatedAppointment.cancelledAt,
+        bookingReference: updatedAppointment.bookingReference,
       },
     });
   } catch (error) {
@@ -1054,16 +1348,18 @@ export const rescheduleAppointment = async (req, res, next) => {
         .json({ message: "Choose a different date or time." });
     }
 
-    await ensureSlotIsAvailable({
+    const slot = await ensureSlotIsAvailable({
       serviceId: String(appointment.service._id),
       date,
       startTime,
       excludeAppointmentId: appointment._id,
+      preferredStaffId: appointment.staff ? String(appointment.staff) : "",
     });
 
     const nextEndTime = formatTime(
       parseTime(startTime) + Number(appointment.service.durationMinutes || 60),
     );
+    appointment.staff = slot.staffId;
     appointment.date = normalizeDateValue(date);
     appointment.startTime = startTime;
     appointment.endTime = nextEndTime;
@@ -1149,13 +1445,15 @@ export const rescheduleStaffAppointment = async (req, res, next) => {
       });
     }
 
-    await ensureSlotIsAvailable({
+    const slot = await ensureSlotIsAvailable({
       serviceId: String(appointment.service._id),
       date,
       startTime,
       excludeAppointmentId: appointment._id,
+      preferredStaffId: appointment.staff ? String(appointment.staff) : "",
     });
 
+    appointment.staff = slot.staffId;
     appointment.date = normalizeDateValue(date);
     appointment.startTime = startTime;
     appointment.endTime = formatTime(

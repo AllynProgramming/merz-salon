@@ -24,11 +24,27 @@ import useAuth from "../context/useAuth.js";
 import {
   createAppointment,
   getAvailability,
+  getAvailabilityCalendar,
   getServices,
 } from "../services/bookingApi.js";
+import { bookingSchedule } from "../config/bookingSchedule.js";
 import "../styles/booking.css";
 
 const steps = ["Service", "Date", "Time", "Review", "Confirmation"];
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCalendarDateRange() {
+  const today = new Date();
+  const lastDate = new Date(today);
+  lastDate.setDate(lastDate.getDate() + bookingSchedule.maximumDaysAhead);
+  return { from: localDateKey(today), to: localDateKey(lastDate) };
+}
 
 function BookingPage() {
   const [searchParams] = useSearchParams();
@@ -40,6 +56,12 @@ function BookingPage() {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
   const [serviceId, setServiceId] = useState(initialService);
+  const [dateAvailability, setDateAvailability] = useState(null);
+  const [calendarLoading, setCalendarLoading] = useState(
+    Boolean(initialService),
+  );
+  const [calendarError, setCalendarError] = useState("");
+  const [calendarRetry, setCalendarRetry] = useState(0);
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [slot, setSlot] = useState(null);
@@ -75,6 +97,39 @@ function BookingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!serviceId || step !== 1) return undefined;
+
+    let active = true;
+    const range = getCalendarDateRange();
+    getAvailabilityCalendar({ serviceId, ...range, token })
+      .then((result) => {
+        if (active) {
+          setDateAvailability(
+            Object.fromEntries(
+              (result.days || []).map((day) => [day.date, day]),
+            ),
+          );
+          setCalendarError("");
+        }
+      })
+      .catch((requestError) => {
+        if (active) {
+          setDateAvailability({});
+          setCalendarError(
+            requestError.message || "We couldn't load date availability.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setCalendarLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [serviceId, token, calendarRetry, step]);
 
   useEffect(() => {
     if (!serviceId || !date) return undefined;
@@ -119,6 +174,9 @@ function BookingPage() {
 
   const chooseService = (service) => {
     setServiceId(service._id);
+    setDateAvailability(null);
+    setCalendarLoading(true);
+    setCalendarError("");
     setDate("");
     setSlots([]);
     setSlot(null);
@@ -139,6 +197,13 @@ function BookingPage() {
     setSlotRetry((value) => value + 1);
   };
 
+  const refreshCalendar = () => {
+    setDateAvailability(null);
+    setCalendarLoading(true);
+    setCalendarError("");
+    setCalendarRetry((value) => value + 1);
+  };
+
   const next = () => {
     setError("");
     if (step === 0 && !selectedService)
@@ -152,6 +217,11 @@ function BookingPage() {
 
   const back = () => {
     setError("");
+    if (step === 2) {
+      setDateAvailability(null);
+      setCalendarLoading(true);
+      setCalendarError("");
+    }
     setStep((value) => Math.max(value - 1, 0));
   };
 
@@ -281,15 +351,34 @@ function BookingPage() {
                 <>
                   <h2>Select a date</h2>
                   <p className="booking-panel-intro">
-                    Pick an open day for{" "}
+                    Available dates and times reflect staff schedules and
+                    existing bookings for{" "}
                     {selectedService?.name || "your service"}.
                   </p>
                   {selectedService ? (
-                    <DatePicker
-                      value={date}
-                      onChange={chooseDate}
-                      serviceDuration={selectedService.durationMinutes}
-                    />
+                    <>
+                      <DatePicker
+                        value={date}
+                        onChange={chooseDate}
+                        serviceDuration={selectedService.durationMinutes}
+                        availabilityByDate={
+                          calendarLoading ? undefined : dateAvailability || {}
+                        }
+                        availabilityLoading={calendarLoading}
+                      />
+                      {calendarError && (
+                        <div className="booking-calendar-error" role="alert">
+                          <span>{calendarError}</span>
+                          <button
+                            className="booking-button booking-button-outline"
+                            type="button"
+                            onClick={refreshCalendar}
+                          >
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="booking-state booking-state-error">
                       That service is no longer available.{" "}
@@ -327,8 +416,9 @@ function BookingPage() {
                     endTime={slot?.endTime}
                   />
                   <p className="booking-review-note">
-                    Your appointment will be pending until our staff confirms
-                    it.
+                    Your request stays pending while staff confirms it. If
+                    you’re running late, contact the salon so they can help
+                    with your booking.
                   </p>
                 </>
               )}

@@ -519,11 +519,33 @@
   cursor: not-allowed;
 }
 
+.booking-page .booking-calendar.is-loading .booking-calendar-day:disabled {
+  text-decoration: none;
+}
+
+.booking-page .booking-calendar.is-loading .booking-calendar-day.is-selected {
+  color: #fff;
+}
+
 .booking-page .booking-calendar-note,
 .booking-page .booking-calendar-selection {
   margin: 12px 0 0;
   color: #52695a;
   font-size: 11px;
+}
+
+.booking-page .booking-calendar-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(150, 48, 48, 0.2);
+  background: #fff6f4;
+  color: #873d36;
+  font-size: 12px;
 }
 
 .booking-page .booking-slot-legend {
@@ -718,6 +740,11 @@
 .booking-page .booking-status-cancelled {
   background: #fff0ed;
   color: #76241d;
+}
+
+.booking-page .booking-status-expired {
+  background: #f1edf5;
+  color: #5e4c73;
 }
 
 .booking-page .booking-appointment-card {

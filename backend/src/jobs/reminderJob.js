@@ -3,14 +3,22 @@ import nodemailer from "nodemailer";
 
 import Appointment from "../models/appointment.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
-import { reminderWindowHours } from "../config/schedule.js";
-import { changeAppointmentStatus } from "../utils/appointmentStatus.js";
+import { reminderWindowHours, salonSchedule } from "../config/schedule.js";
+import {
+  getSalonClock,
+  hasPassedConfirmationDeadline,
+} from "../utils/salonTime.js";
+import {
+  buildStatusHistoryEntry,
+  changeAppointmentStatus,
+} from "../utils/appointmentStatus.js";
 import {
   createAppointmentNotifications,
   syncReminderState,
 } from "../services/notification.service.js";
 
 let reminderJob;
+let expirationJob;
 
 const transport =
   process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
@@ -46,6 +54,53 @@ const sendReminderEmail = async (appointment, notification) => {
   } catch (error) {
     console.error("Failed to send appointment reminder email:", error.message);
     return false;
+  }
+};
+
+export const expireUnconfirmedAppointments = async () => {
+  const salonNow = getSalonClock();
+  const today = new Date(`${salonNow.date}T00:00:00.000Z`);
+  const overdueAppointments = await Appointment.find({
+    status: APPOINTMENT_STATUS.PENDING,
+    date: { $lte: today },
+  })
+    .populate("service", "name")
+    .select("_id customer service date startTime status statusHistory");
+
+  for (const appointment of overdueAppointments) {
+    const appointmentDate = appointment.date.toISOString().slice(0, 10);
+    if (
+      !hasPassedConfirmationDeadline({
+        appointmentDate,
+        startTime: appointment.startTime,
+        salonNow,
+      })
+    ) {
+      continue;
+    }
+
+    const expiredAppointment = await Appointment.findOneAndUpdate(
+      { _id: appointment._id, status: APPOINTMENT_STATUS.PENDING },
+      {
+        $set: { status: APPOINTMENT_STATUS.EXPIRED },
+        $push: {
+          statusHistory: buildStatusHistoryEntry({
+            status: APPOINTMENT_STATUS.EXPIRED,
+            changedBy: "system",
+            note: `Booking expired because it was not confirmed within ${salonSchedule.appointmentConfirmationGraceMinutes} minutes after its scheduled start time.`,
+          }),
+        },
+      },
+      { new: true },
+    );
+    if (!expiredAppointment) continue;
+
+    await createAppointmentNotifications({
+      appointment: expiredAppointment,
+      type: "booking_expired",
+      title: "Appointment request expired",
+      message: `Your ${appointment.service?.name || "appointment"} request for ${appointmentDate} at ${appointment.startTime} expired because it was not confirmed within ${salonSchedule.appointmentConfirmationGraceMinutes} minutes after the scheduled start. Please book another time.`,
+    });
   }
 };
 
@@ -142,16 +197,28 @@ export const sendAppointmentReminders = async () => {
 };
 
 export const startReminderJob = () => {
-  if (reminderJob) return reminderJob;
+  if (reminderJob && expirationJob) return reminderJob;
 
-  reminderJob = cron.schedule("*/15 * * * *", async () => {
+  if (!expirationJob) {
+    expirationJob = cron.schedule("* * * * *", async () => {
+    try {
+      await expireUnconfirmedAppointments();
+    } catch (error) {
+      console.error("Appointment expiration job failed:", error.message);
+    }
+    });
+  }
+
+  if (!reminderJob) {
+    reminderJob = cron.schedule("*/15 * * * *", async () => {
     try {
       await completePastAppointments();
       await sendAppointmentReminders();
     } catch (error) {
       console.error("Reminder job failed:", error.message);
     }
-  });
+    });
+  }
 
   return reminderJob;
 };

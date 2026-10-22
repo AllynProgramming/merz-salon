@@ -86,8 +86,8 @@ function BookingConfirmationPage() {
               <p className="booking-eyebrow">Appointment request received</p>
               <h1 id="confirmation-title">Your appointment is pending</h1>
               <p className="booking-lede">
-                Keep this reference handy. Our staff will review your request
-                and confirm the appointment before your visit.
+                Keep this reference handy. Your request stays pending while
+                staff confirms it. If you’re running late, contact the salon.
               </p>
               <BookingSummary
                 service={service}

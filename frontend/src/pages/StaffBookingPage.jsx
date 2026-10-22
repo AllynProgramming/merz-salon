@@ -3,10 +3,12 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import { formatDuration, formatPrice } from "../components/booking/bookingUtils.js";
+import DatePicker from "../components/booking/DatePicker.jsx";
 import { bookingSchedule } from "../config/bookingSchedule.js";
 import {
   createStaffAppointment,
   getServices,
+  getStaffAvailabilityCalendar,
   getStaffAvailability,
   searchBookingCustomers,
 } from "../services/bookingApi.js";
@@ -39,6 +41,13 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
+function formatDate(value) {
+  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(
+    new Date(year, month - 1, day),
+  );
+}
+
 function StaffBookingPage() {
   const { token } = useAuth();
   const [services, setServices] = useState([]);
@@ -52,6 +61,11 @@ function StaffBookingPage() {
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [slotRefresh, setSlotRefresh] = useState(0);
+  const [dateAvailability, setDateAvailability] = useState(null);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState("");
+  const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [startTime, setStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -77,6 +91,43 @@ function StaffBookingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!serviceId) return undefined;
+
+    let active = true;
+    const bounds = getDateBounds();
+    getStaffAvailabilityCalendar({
+      serviceId,
+      from: bounds.minimum,
+      to: bounds.maximum,
+      token,
+    })
+      .then((result) => {
+        if (active) {
+          setDateAvailability(
+            Object.fromEntries(
+              (result.days || []).map((day) => [day.date, day]),
+            ),
+          );
+        }
+      })
+      .catch((requestError) => {
+        if (active) {
+          setDateAvailability({});
+          setCalendarError(
+            requestError.message || "Could not load date availability.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setCalendarLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [serviceId, token, calendarRefresh]);
 
   useEffect(() => {
     const search = customerSearch.trim();
@@ -130,11 +181,9 @@ function StaffBookingPage() {
     return () => {
       active = false;
     };
-  }, [serviceId, date, token]);
+  }, [serviceId, date, token, slotRefresh]);
 
   const selectedService = services.find((service) => service._id === serviceId);
-  const availableSlots = slots.filter((slot) => slot.available);
-  const dateBounds = getDateBounds();
 
   const updateCustomerSearch = (event) => {
     const value = event.target.value;
@@ -152,12 +201,14 @@ function StaffBookingPage() {
     setSlots([]);
     setStartTime("");
     setAvailabilityLoading(Boolean(value && date));
+    setDateAvailability(null);
+    setCalendarLoading(Boolean(value));
+    setCalendarError("");
     setError("");
     setResult(null);
   };
 
-  const updateDate = (event) => {
-    const value = event.target.value;
+  const updateDate = (value) => {
     setDate(value);
     setSlots([]);
     setStartTime("");
@@ -189,6 +240,12 @@ function StaffBookingPage() {
       setResult(response.appointment);
       setStartTime("");
       setSlots([]);
+      setAvailabilityLoading(true);
+      setDateAvailability(null);
+      setCalendarLoading(true);
+      setCalendarError("");
+      setSlotRefresh((version) => version + 1);
+      setCalendarRefresh((version) => version + 1);
     } catch (requestError) {
       setError(
         requestError.message ||
@@ -227,11 +284,46 @@ function StaffBookingPage() {
         )}
         {result && (
           <div className="staff-booking__success" role="status">
-            <strong>Appointment booked successfully.</strong>
-            <span>
-              {result.bookingReference} · {result.serviceName} ·{" "}
-              {result.date.slice(0, 10)} at {formatTime(result.startTime)}
-            </span>
+            <div className="staff-booking__success-heading">
+              <svg
+                className="staff-booking__success-icon"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <circle cx="10" cy="10" r="8.25" />
+                <path d="m6.5 10 2.25 2.25 4.75-5" />
+              </svg>
+              <strong>Appointment confirmed</strong>
+            </div>
+            <p>
+              The appointment is confirmed and the customer has been notified.
+            </p>
+            <dl className="staff-booking__confirmation-details">
+              <div>
+                <dt>Customer</dt>
+                <dd>{customer?.name || "Customer"}</dd>
+              </div>
+              <div>
+                <dt>Service</dt>
+                <dd>{result.serviceName}</dd>
+              </div>
+              <div>
+                <dt>Date and time</dt>
+                <dd>
+                  {formatDate(result.date)} · {formatTime(result.startTime)}
+                  {result.endTime && `–${formatTime(result.endTime)}`}
+                </dd>
+              </div>
+              <div>
+                <dt>Booking reference</dt>
+                <dd>{result.bookingReference}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Confirmed</dd>
+              </div>
+            </dl>
           </div>
         )}
         {servicesError && (
@@ -324,48 +416,93 @@ function StaffBookingPage() {
                 )}
               </div>
             )}
-            <label className="staff-booking__field">
-              <span>Appointment date</span>
-              <input
-                type="date"
-                value={date}
-                onChange={updateDate}
-                min={dateBounds.minimum}
-                max={dateBounds.maximum}
-                required
-              />
-            </label>
+            <div
+              className="staff-booking__field"
+              role="group"
+              aria-labelledby="staff-booking-date-label"
+            >
+              <span id="staff-booking-date-label">Appointment date</span>
+              {selectedService && (
+                <DatePicker
+                  value={date}
+                  onChange={updateDate}
+                  serviceDuration={selectedService.durationMinutes}
+                  availabilityByDate={
+                    calendarLoading
+                      ? undefined
+                      : dateAvailability || {}
+                  }
+                  availabilityLoading={calendarLoading}
+                />
+              )}
+              {calendarError && (
+                <div className="staff-booking__calendar-error" role="alert">
+                  <span>{calendarError}</span>
+                  <button
+                    type="button"
+                    className="customer-button customer-button-outline"
+                    onClick={() => {
+                      setDateAvailability(null);
+                      setCalendarLoading(true);
+                      setCalendarError("");
+                      setCalendarRefresh((version) => version + 1);
+                    }}
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="customer-panel staff-booking__panel">
-            <h2>3. Choose an available time</h2>
+            <h2>3. Choose a time</h2>
             {!serviceId || !date ? (
               <p>Select a service and date to check available times.</p>
             ) : availabilityLoading ? (
               <p role="status">Checking availability…</p>
-            ) : availableSlots.length ? (
-              <div className="staff-booking__slots">
-                {availableSlots.map((slot) => (
-                  <label
-                    className={`staff-booking__slot${startTime === slot.startTime ? " is-selected" : ""}`}
-                    key={slot.startTime}
-                  >
-                    <input
-                      type="radio"
-                      name="appointmentTime"
-                      value={slot.startTime}
-                      checked={startTime === slot.startTime}
-                      onChange={() => {
-                        setStartTime(slot.startTime);
-                        setError("");
-                        setResult(null);
-                      }}
-                      required
-                    />
-                    <span>{formatTime(slot.startTime)}</span>
-                  </label>
-                ))}
-              </div>
+            ) : slots.length ? (
+              <>
+                <p className="staff-booking__availability-note">
+                  Choose a green time. Muted times are unavailable and show why.
+                </p>
+                <ul className="staff-booking__availability-legend" aria-label="Time slot availability">
+                  <li>
+                    <span className="is-available" aria-hidden="true" />
+                    Available
+                  </li>
+                  <li>
+                    <span className="is-unavailable" aria-hidden="true" />
+                    Unavailable
+                  </li>
+                </ul>
+                <div className="staff-booking__slots">
+                  {slots.map((slot) => (
+                    <label
+                      className={`staff-booking__slot${startTime === slot.startTime ? " is-selected" : ""}${slot.available ? "" : " is-unavailable"}`}
+                      key={slot.startTime}
+                      title={slot.available ? "Available" : slot.reason}
+                    >
+                      <input
+                        type="radio"
+                        name="appointmentTime"
+                        value={slot.startTime}
+                        checked={startTime === slot.startTime}
+                        disabled={!slot.available}
+                        onChange={() => {
+                          setStartTime(slot.startTime);
+                          setError("");
+                          setResult(null);
+                        }}
+                      />
+                      <span>{formatTime(slot.startTime)}</span>
+                      {!slot.available && (
+                        <small>{slot.reason || "Unavailable"}</small>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </>
             ) : (
               <p className="staff-booking__no-slots">
                 No available times for this service and date. Try another date.
