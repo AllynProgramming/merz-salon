@@ -44,6 +44,30 @@
   line-height: 1.6;
 }
 
+.booking-page .booking-header.admin-section-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 30px;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid rgba(32, 86, 56, 0.12);
+  border-bottom: 3px solid #b9934c;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(24, 61, 44, 0.045);
+}
+
+.booking-page .booking-header.admin-section-heading h1 {
+  font-size: clamp(40px, 5.6vw, 62px);
+  letter-spacing: -0.035em;
+}
+
+.booking-page .booking-header.admin-section-heading .booking-lede {
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
 .admin-dashboard__heading {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.6fr);
@@ -1021,6 +1045,12 @@
 
 @media (max-width: 640px) {
   .admin-section-heading {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    padding: 24px 20px;
+  }
+
+  .booking-page .booking-header.admin-section-heading {
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
     padding: 24px 20px;

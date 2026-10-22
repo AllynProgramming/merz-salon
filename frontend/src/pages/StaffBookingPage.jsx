@@ -13,6 +13,7 @@ import {
   searchBookingCustomers,
 } from "../services/bookingApi.js";
 import "../styles/booking.css";
+import "../styles/admin-dashboard.css";
 import "../styles/staff-services.css";
 import "../styles/staff-booking.css";
 
@@ -263,7 +264,7 @@ function StaffBookingPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <main className="booking-container staff-booking">
-        <header className="booking-header staff-services__header">
+        <header className="booking-header staff-services__header admin-section-heading">
           <div>
             <p className="booking-eyebrow">Salon operations</p>
             <h1>Book for a Customer</h1>
