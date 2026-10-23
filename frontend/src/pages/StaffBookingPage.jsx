@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import {
   formatDuration,
@@ -45,15 +45,9 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
-function formatDate(value) {
-  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(
-    new Date(year, month - 1, day),
-  );
-}
-
 function StaffBookingPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
@@ -71,7 +65,6 @@ function StaffBookingPage() {
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [slotRefresh, setSlotRefresh] = useState(0);
   const [dateAvailability, setDateAvailability] = useState(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarError, setCalendarError] = useState("");
@@ -79,7 +72,6 @@ function StaffBookingPage() {
   const [startTime, setStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -191,7 +183,7 @@ function StaffBookingPage() {
     return () => {
       active = false;
     };
-  }, [serviceId, date, token, slotRefresh]);
+  }, [serviceId, date, token]);
 
   const selectedService = services.find((service) => service._id === serviceId);
 
@@ -202,25 +194,12 @@ function StaffBookingPage() {
     setCustomers([]);
     setCustomersLoading(value.trim().length >= 2);
     setError("");
-    setResult(null);
   };
 
   const updateWalkInCustomer = (event) => {
     const { name, value } = event.target;
     setWalkInCustomer((current) => ({ ...current, [name]: value }));
     setError("");
-    setResult(null);
-  };
-
-  const toggleWalkInMode = () => {
-    setWalkInMode((current) => !current);
-    if (!walkInMode) {
-      setCustomer(null);
-      setCustomerSearch("");
-      setCustomers([]);
-    }
-    setError("");
-    setResult(null);
   };
 
   const updateService = (event) => {
@@ -233,7 +212,6 @@ function StaffBookingPage() {
     setCalendarLoading(Boolean(value));
     setCalendarError("");
     setError("");
-    setResult(null);
   };
 
   const updateDate = (value) => {
@@ -242,7 +220,6 @@ function StaffBookingPage() {
     setStartTime("");
     setAvailabilityLoading(Boolean(value && serviceId));
     setError("");
-    setResult(null);
   };
 
   const walkInReady =
@@ -255,20 +232,6 @@ function StaffBookingPage() {
     Boolean(serviceId) &&
     Boolean(date) &&
     Boolean(startTime);
-
-  const resetBookingForm = () => {
-    setResult(null);
-    setError("");
-    setCustomer(null);
-    setCustomerSearch("");
-    setCustomers([]);
-    setWalkInCustomer({ name: "", phone: "", email: "" });
-    setStartTime("");
-    setSlots([]);
-    setDate("");
-    setServiceId("");
-    setDateAvailability(null);
-  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -311,7 +274,6 @@ function StaffBookingPage() {
 
     setSubmitting(true);
     setError("");
-    setResult(null);
     try {
       const payload = walkInMode
         ? {
@@ -332,21 +294,17 @@ function StaffBookingPage() {
           };
 
       const response = await createStaffAppointment(payload, token);
-      setResult({
-        ...response.appointment,
-        isWalkIn: walkInMode,
-      });
-      setStartTime("");
-      setSlots([]);
-      setAvailabilityLoading(true);
-      setDateAvailability(null);
-      setCalendarLoading(true);
-      setCalendarError("");
-      setSlotRefresh((version) => version + 1);
-      setCalendarRefresh((version) => version + 1);
-      if (walkInMode) {
-        setWalkInCustomer({ name: "", phone: "", email: "" });
-      }
+      navigate(
+        `/staff/book-appointment/${response.appointment._id}/success`,
+        {
+          state: {
+            appointment: {
+              ...response.appointment,
+              isWalkIn: walkInMode,
+            },
+          },
+        },
+      );
     } catch (requestError) {
       setError(
         requestError.message ||
@@ -383,78 +341,6 @@ function StaffBookingPage() {
             {error}
           </div>
         )}
-        {result && (
-          <div className="staff-booking__success" role="status">
-            <div className="staff-booking__success-heading">
-              <svg
-                className="staff-booking__success-icon"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <circle cx="10" cy="10" r="8.25" />
-                <path d="m6.5 10 2.25 2.25 4.75-5" />
-              </svg>
-              <strong>Appointment confirmed</strong>
-            </div>
-            <p>
-              The appointment is confirmed and scheduled in the salon calendar.
-            </p>
-            <dl className="staff-booking__confirmation-details">
-              <div>
-                <dt>Customer</dt>
-                <dd>
-                  {result.customerName ||
-                    customer?.name ||
-                    "Walk-in Customer"}
-                  {result.isWalkIn && (
-                    <span className="staff-booking__walkin-badge">Walk-in</span>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Service</dt>
-                <dd>{result.serviceName}</dd>
-              </div>
-              <div>
-                <dt>Date and time</dt>
-                <dd>
-                  {formatDate(result.date)} · {formatTime(result.startTime)}
-                  {result.endTime && `–${formatTime(result.endTime)}`}
-                </dd>
-              </div>
-              {result.staffName && (
-                <div>
-                  <dt>Staff</dt>
-                  <dd>{result.staffName}</dd>
-                </div>
-              )}
-              <div>
-                <dt>Booking reference</dt>
-                <dd>{result.bookingReference}</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>Confirmed</dd>
-              </div>
-            </dl>
-            <div className="staff-booking__confirmation-actions">
-              <button
-                type="button"
-                className="customer-button customer-button-primary"
-                onClick={resetBookingForm}
-              >
-                Book another appointment
-              </button>
-              <Link
-                className="customer-button customer-button-outline"
-                to="/admin/schedule"
-              >
-                View salon schedule
-              </Link>
-            </div>
-          </div>
-        )}
         {servicesError && (
           <div className="booking-state booking-state-error" role="alert">
             {servicesError}
@@ -479,7 +365,6 @@ function StaffBookingPage() {
                     if (walkInMode) {
                       setWalkInMode(false);
                       setError("");
-                      setResult(null);
                     }
                   }}
                 >
@@ -510,7 +395,6 @@ function StaffBookingPage() {
                       setCustomerSearch("");
                       setCustomers([]);
                       setError("");
-                      setResult(null);
                     }
                   }}
                 >
@@ -835,7 +719,6 @@ function StaffBookingPage() {
                         onChange={() => {
                           setStartTime(slot.startTime);
                           setError("");
-                          setResult(null);
                         }}
                       />
                       <span>{formatTime(slot.startTime)}</span>
