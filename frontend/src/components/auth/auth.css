@@ -265,6 +265,27 @@
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
+.auth-button-secondary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 14px;
+  border: 1px solid rgba(32, 86, 56, 0.25);
+  background: #fff;
+  color: #205638;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-button-secondary:hover {
+  background: #edf4ed;
+}
+
+.auth-button-secondary:focus-visible {
+  outline: 2px solid #b9934c;
+  outline-offset: 3px;
+}
+
 .auth-submit:hover:not(:disabled) {
   transform: translateY(-1px);
   background: #173f2b;

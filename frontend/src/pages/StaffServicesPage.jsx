@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { formatDuration, formatPrice } from "../components/booking/bookingUtils.js";
+import {
+  formatDuration,
+  formatPrice,
+} from "../components/booking/bookingUtils.js";
 import { getServices } from "../services/bookingApi.js";
 import "../styles/booking.css";
 import "../styles/admin-dashboard.css";
@@ -57,7 +60,10 @@ function StaffServicesPage() {
             >
               Book for Customer
             </Link>
-            <Link className="customer-button customer-button-outline" to="/admin">
+            <Link
+              className="customer-button customer-button-outline"
+              to="/staff"
+            >
               Back to dashboard
             </Link>
           </div>

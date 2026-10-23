@@ -19,6 +19,8 @@ import AdminReportsPage from "./pages/AdminReportsPage.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx";
 import StaffServicesPage from "./pages/StaffServicesPage.jsx";
 import StaffBookingPage from "./pages/StaffBookingPage.jsx";
+import AdminSettingsPage from "./pages/AdminSettingsPage.jsx";
+import GoogleCallbackPage from "./pages/GoogleCallbackPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -26,6 +28,7 @@ function Routes() {
     { path: "/services", element: <ServicesPage /> },
     { path: "/login", element: <LoginPage /> },
     { path: "/register", element: <RegisterPage /> },
+    { path: "/auth/google/callback", element: <GoogleCallbackPage /> },
     {
       element: <ProtectedRoute />,
       children: [
@@ -44,17 +47,22 @@ function Routes() {
     {
       element: <ProtectedRoute allowedRoles={["staff", "admin"]} />,
       children: [
-        { path: "/admin", element: <AdminDashboardPage /> },
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
         { path: "/staff/services", element: <StaffServicesPage /> },
         { path: "/staff/book-appointment", element: <StaffBookingPage /> },
       ],
     },
     {
+      element: <ProtectedRoute allowedRoles={["staff"]} />,
+      children: [{ path: "/staff", element: <AdminDashboardPage /> }],
+    },
+    {
       element: <ProtectedRoute allowedRoles={["admin"]} />,
       children: [
+        { path: "/admin", element: <AdminDashboardPage /> },
         { path: "/admin/staff", element: <AdminStaffPage /> },
         { path: "/admin/services", element: <AdminServicesPage /> },
+        { path: "/admin/settings", element: <AdminSettingsPage /> },
         { path: "/admin/feedback", element: <AdminFeedbackPage /> },
         { path: "/admin/reports", element: <AdminReportsPage /> },
       ],

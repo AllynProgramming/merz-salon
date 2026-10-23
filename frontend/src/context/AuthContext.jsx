@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AuthContext from "./auth-context.js";
 
 const TOKEN_KEY = "merz.auth.token";
@@ -123,6 +123,15 @@ export function AuthProvider({ children }) {
     return response.user;
   };
 
+  const loginWithToken = useCallback(async (authToken) => {
+    localStorage.setItem(TOKEN_KEY, authToken);
+    setToken(authToken);
+    const response = await authRequest("/api/users/me", { token: authToken });
+    setUser(response.user);
+    setAuthNotice("");
+    return response.user;
+  }, []);
+
   const logout = async () => {
     const activeToken = token;
     try {
@@ -172,6 +181,7 @@ export function AuthProvider({ children }) {
         isRestoring,
         register,
         login,
+        loginWithToken,
         logout,
         authNotice,
         updateProfile,

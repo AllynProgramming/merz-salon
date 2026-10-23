@@ -26,6 +26,15 @@ function LoginPage() {
   const [serverError, setServerError] = useState("");
   const [success, setSuccess] = useState(location.state?.notice || "");
   const [loading, setLoading] = useState(false);
+  const googleError = new URLSearchParams(location.search).get("google_error");
+  const googleMessages = {
+    disabled: "Google login is currently disabled.",
+    customer_only: "Google login is available for customer accounts only.",
+    exchange_failed: "Google login could not be completed.",
+    profile_failed: "Google did not return a verified customer profile.",
+    account_conflict: "This Google account is already linked to another account.",
+    server: "Google login could not be completed. Please try again.",
+  };
   const errors = validate(values);
 
   const update = (event) => {
@@ -74,7 +83,17 @@ function LoginPage() {
         Your appointments and schedule are right where you left them.
       </p>
       <Alert>{serverError}</Alert>
+      <Alert>{googleMessages[googleError] || ""}</Alert>
       <Alert variant="success">{success}</Alert>
+      <button
+        className="auth-button auth-button-secondary"
+        type="button"
+        onClick={() => {
+          window.location.href = "/api/auth/google";
+        }}
+      >
+        Continue with Google
+      </button>
 
       <form className="auth-form" onSubmit={submit} noValidate>
         <FormField

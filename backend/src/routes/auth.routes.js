@@ -5,6 +5,8 @@ import {
   login,
   logout,
   getMe,
+  googleLogin,
+  googleCallback,
 } from "../controllers/auth.controller.js";
 import { protect, requireCustomer } from "../middlewares/auth.middleware.js";
 
@@ -15,5 +17,7 @@ router.post("/signup", signup);
 router.post("/login", login);
 router.post("/logout", logout);
 router.get("/me", protect, getMe);
+router.get("/google", googleLogin);
+router.get("/google/callback", googleCallback);
 
 export default router;

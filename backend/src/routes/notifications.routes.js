@@ -7,11 +7,11 @@ import {
   markNotificationAsRead,
   removeNotification,
 } from "../controllers/notification.controller.js";
-import { protect, requireCustomer } from "../middlewares/auth.middleware.js";
+import { protect } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.use(protect, requireCustomer);
+router.use(protect);
 router.get("/", getNotifications);
 router.get("/unread-count", getNotificationCount);
 router.patch("/read-all", markAllNotificationsAsRead);
