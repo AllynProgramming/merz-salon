@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import Appointment from "../models/appointment.model.js";
@@ -110,14 +111,38 @@ const createAppointmentSchema = z
   })
   .strict();
 
+const walkInCustomerSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    phone: z.string().trim().min(7).max(30),
+    email: z.string().trim().email().max(254).optional().or(z.literal("")),
+  })
+  .strict();
+
 const createStaffAppointmentSchema = z
   .object({
-    customerId: z.string().regex(objectIdPattern, "Choose a valid customer."),
+    customerId: z
+      .string()
+      .regex(objectIdPattern, "Choose a valid customer.")
+      .optional()
+      .nullable(),
+    walkInCustomer: walkInCustomerSchema.optional(),
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
     startTime: z.string().regex(timePattern, "Choose a valid time."),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ customerId, walkInCustomer }) =>
+      Boolean(customerId) ||
+      Boolean(
+        walkInCustomer && walkInCustomer.name && walkInCustomer.phone,
+      ),
+    {
+      message: "Choose a customer or enter walk-in customer details.",
+      path: ["customerId"],
+    },
+  );
 
 const staffCustomerSearchSchema = z
   .object({
@@ -985,17 +1010,68 @@ export const createStaffAppointment = async (req, res, next) => {
   }
 
   try {
-    const { customerId, serviceId, date, startTime } = validation.data;
-    const [customer, service] = await Promise.all([
-      User.findOne({ _id: customerId, role: "customer" }).select("_id"),
+    const { customerId, walkInCustomer, serviceId, date, startTime } =
+      validation.data;
+
+    const [customerRecord, service] = await Promise.all([
+      customerId
+        ? User.findOne({ _id: customerId, role: "customer" }).select("_id name email phone phoneNumber")
+        : Promise.resolve(null),
       Service.findOne({ _id: serviceId, isActive: true }),
     ]);
 
-    if (!customer) {
+    if (!customerRecord && !walkInCustomer) {
       return res.status(404).json({ message: "Customer account not found." });
     }
     if (!service) {
       return res.status(404).json({ message: "Choose an available service." });
+    }
+
+    const walkInName = walkInCustomer?.name?.trim();
+    const walkInPhone = walkInCustomer?.phone?.trim();
+    const walkInEmail = walkInCustomer?.email?.trim() || "";
+
+    let customer = customerRecord;
+    if (!customer && walkInCustomer) {
+      const normalizedEmail = walkInEmail.toLowerCase();
+      const orConditions = [];
+      if (normalizedEmail) {
+        orConditions.push({ email: normalizedEmail });
+      }
+      if (walkInPhone) {
+        orConditions.push({ phone: walkInPhone }, { phoneNumber: walkInPhone });
+      }
+
+      const existingWalkIn =
+        orConditions.length > 0
+          ? await User.findOne({
+              $or: orConditions,
+            }).lean()
+          : null;
+
+      if (existingWalkIn) {
+        customer = existingWalkIn;
+      } else {
+        const generatedEmail =
+          normalizedEmail ||
+          `walkin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@walkin.local`;
+        const password = await bcrypt.hash(
+          `walkin-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          12,
+        );
+        const savedCustomer = await User.create({
+          name: walkInName,
+          firstname: walkInName.split(/\s+/)[0] || walkInName,
+          lastname: walkInName.split(/\s+/).slice(1).join(" ") || "",
+          email: generatedEmail,
+          phone: walkInPhone,
+          phoneNumber: walkInPhone,
+          password,
+          role: "customer",
+          address: "",
+        });
+        customer = savedCustomer;
+      }
     }
 
     const appointmentDate = normalizeDateValue(date);
@@ -1036,6 +1112,12 @@ export const createStaffAppointment = async (req, res, next) => {
     });
     await appointment.populate("staff", "name firstname lastname");
 
+    const customerName =
+      customer.name ||
+      [customer.firstname, customer.lastname].filter(Boolean).join(" ") ||
+      walkInName ||
+      "Customer";
+
     await createAppointmentNotifications({
       appointment,
       type: "booking_confirmed",
@@ -1061,6 +1143,8 @@ export const createStaffAppointment = async (req, res, next) => {
         servicePrice: service.price,
         durationMinutes: service.durationMinutes,
         staffName: getStaffDisplayName(appointment.staff),
+        customerName,
+        isWalkIn: Boolean(walkInCustomer),
         date: appointment.date,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
