@@ -2,6 +2,7 @@ import cron from "node-cron";
 import nodemailer from "nodemailer";
 
 import Appointment from "../models/appointment.model.js";
+import IntegrationSettings from "../models/integrationSettings.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
 import { reminderWindowHours, salonSchedule } from "../config/schedule.js";
 import {
@@ -128,6 +129,8 @@ export const completePastAppointments = async () => {
 };
 
 export const sendAppointmentReminders = async () => {
+  const settings = await IntegrationSettings.findOne({ key: "default" }).lean();
+  if (settings && !settings.appointmentReminders) return;
   const now = new Date();
   const upcoming = await Appointment.find({
     status: { $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED] },
@@ -186,7 +189,10 @@ export const sendAppointmentReminders = async () => {
       });
 
       if (notification) {
-        const emailSent = await sendReminderEmail(appointment, notification);
+        const emailSent =
+          settings?.emailNotifications === false
+            ? false
+            : await sendReminderEmail(appointment, notification);
         notification.emailSent = emailSent;
         await notification.save();
       }

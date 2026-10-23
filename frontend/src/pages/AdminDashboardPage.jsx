@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import useAuth from "../context/useAuth.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
+import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 
@@ -163,6 +164,7 @@ function AdminDashboardPage() {
             </p>
           </div>
           <div className="admin-dashboard__heading-actions">
+            <StaffNotificationBell />
             <Link
               className="customer-button customer-button-outline admin-dashboard__manage"
               to="/staff/services"
@@ -211,6 +213,14 @@ function AdminDashboardPage() {
                 to="/admin/services"
               >
                 Manage Services
+              </Link>
+            )}
+            {user?.role === "admin" && (
+              <Link
+                className="customer-button customer-button-outline admin-dashboard__manage"
+                to="/admin/settings"
+              >
+                Integrations &amp; Settings
               </Link>
             )}
             <button

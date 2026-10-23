@@ -50,6 +50,12 @@ const userSchema = new mongoose.Schema(
       maxlength: 500,
       default: "",
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
     password: {
       type: String,
       required: true,

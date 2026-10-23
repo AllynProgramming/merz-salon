@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import User from "../models/user.model.js";
+import IntegrationSettings from "../models/integrationSettings.model.js";
 
 const signupSchema = z
   .object({
@@ -195,6 +197,122 @@ export const logout = (req, res) => {
 
 export const getMe = (req, res) => {
   return res.status(200).json({ user: sanitizeUser(req.user) });
+};
+
+const getGoogleConfig = () => ({
+  clientId: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  redirectUri:
+    process.env.GOOGLE_OAUTH_REDIRECT_URI ||
+    "http://localhost:3000/api/auth/google/callback",
+});
+
+const isGoogleLoginEnabled = async () => {
+  const googleConfig = getGoogleConfig();
+  const settings = await IntegrationSettings.findOne({ key: "default" }).lean();
+  return Boolean(
+    settings?.googleLogin &&
+      googleConfig.clientId &&
+      googleConfig.clientSecret &&
+      googleConfig.redirectUri,
+  );
+};
+
+export const googleLogin = async (req, res, next) => {
+  try {
+    const googleConfig = getGoogleConfig();
+    if (!(await isGoogleLoginEnabled())) {
+      return res.status(403).json({ message: "Google login is currently disabled." });
+    }
+
+    const params = new URLSearchParams({
+      client_id: googleConfig.clientId,
+      redirect_uri: googleConfig.redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      access_type: "offline",
+      prompt: "select_account",
+    });
+    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const googleCallback = async (req, res, next) => {
+  const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  try {
+    const googleConfig = getGoogleConfig();
+    if (!(await isGoogleLoginEnabled())) {
+      return res.redirect(`${frontendUrl}/login?google_error=disabled`);
+    }
+    if (!req.query.code) {
+      return res.redirect(`${frontendUrl}/login?google_error=missing_code`);
+    }
+
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: req.query.code,
+        client_id: googleConfig.clientId,
+        client_secret: googleConfig.clientSecret,
+        redirect_uri: googleConfig.redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+    const tokenPayload = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenPayload.access_token) {
+      return res.redirect(`${frontendUrl}/login?google_error=exchange_failed`);
+    }
+
+    const profileResponse = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      { headers: { Authorization: `Bearer ${tokenPayload.access_token}` } },
+    );
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || !profile.sub || !profile.email_verified) {
+      return res.redirect(`${frontendUrl}/login?google_error=profile_failed`);
+    }
+
+    let user = await User.findOne({
+      $or: [{ googleId: profile.sub }, { email: profile.email.toLowerCase() }],
+    });
+    if (user && user.role !== "customer") {
+      return res.redirect(`${frontendUrl}/login?google_error=customer_only`);
+    }
+    if (!user) {
+      const name = profile.name || profile.email.split("@")[0];
+      const generatedPhone = `google-${profile.sub}`.slice(0, 30);
+      user = await User.create({
+          name,
+          firstname: profile.given_name || name.split(/\s+/)[0],
+          lastname: profile.family_name || name.split(/\s+/).slice(1).join(" "),
+          email: profile.email.toLowerCase(),
+          phone: generatedPhone,
+          phoneNumber: generatedPhone,
+          password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12),
+          googleId: profile.sub,
+          avatarUrl: profile.picture || "",
+          role: "customer",
+        });
+    } else {
+      user.googleId = profile.sub;
+      if (profile.picture && !user.avatarUrl) user.avatarUrl = profile.picture;
+      await user.save();
+    }
+
+    const token = generateToken(user._id);
+    return res.redirect(
+      `${frontendUrl}/auth/google/callback?token=${encodeURIComponent(token)}`,
+    );
+  } catch (error) {
+    console.error("Google OAuth callback failed:", error);
+    if (error.code === 11000) {
+      return res.redirect(`${frontendUrl}/login?google_error=account_conflict`);
+    }
+    return res.redirect(`${frontendUrl}/login?google_error=server`);
+  }
 };
 
 export const updateMe = async (req, res, next) => {

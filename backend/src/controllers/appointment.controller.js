@@ -5,7 +5,7 @@ import Feedback from "../models/feedback.model.js";
 import Service from "../models/service.model.js";
 import User from "../models/user.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
-import { salonSchedule } from "../config/schedule.js";
+import { getDefaultWorkingHours, salonSchedule } from "../config/schedule.js";
 import {
   buildStatusHistoryEntry,
   changeAppointmentStatus,
@@ -147,6 +147,9 @@ const formatTime = (minutes) => {
   const mins = minutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 };
+
+const getStaffWorkingHours = (staff) =>
+  staff?.workingHours?.length ? staff.workingHours : getDefaultWorkingHours();
 
 const getStaffDisplayName = (staff) =>
   staff?.name ||
@@ -333,7 +336,7 @@ const getAvailabilitySlots = ({
     ).length;
     const scheduledStaffIds = staffMembers
       .filter((staff) => {
-        const workday = staff.workingHours?.find(
+        const workday = getStaffWorkingHours(staff).find(
           (hours) => hours.weekday === localDate.getUTCDay(),
         );
         return (
@@ -702,7 +705,7 @@ export const assignAppointmentStaff = async (req, res, next) => {
     }
 
     const weekday = appointment.date.getUTCDay();
-    const workday = staff.workingHours?.find(
+    const workday = getStaffWorkingHours(staff).find(
       (hours) => hours.weekday === weekday,
     );
     if (!workday || !workday.enabled) {
@@ -1201,7 +1204,7 @@ export const confirmAppointment = async (req, res, next) => {
           message: "This appointment is assigned to another staff member.",
         });
       }
-      const workday = req.user.workingHours?.find(
+      const workday = getStaffWorkingHours(req.user).find(
         (hours) => hours.weekday === appointment.date.getUTCDay(),
       );
       if (

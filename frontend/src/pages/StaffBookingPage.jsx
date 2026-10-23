@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
-import { formatDuration, formatPrice } from "../components/booking/bookingUtils.js";
+import {
+  formatDuration,
+  formatPrice,
+} from "../components/booking/bookingUtils.js";
 import DatePicker from "../components/booking/DatePicker.jsx";
 import { bookingSchedule } from "../config/bookingSchedule.js";
 import {
@@ -273,7 +276,7 @@ function StaffBookingPage() {
               time.
             </p>
           </div>
-          <Link className="customer-button customer-button-outline" to="/admin">
+          <Link className="customer-button customer-button-outline" to="/staff">
             Back to dashboard
           </Link>
         </header>
@@ -435,9 +438,7 @@ function StaffBookingPage() {
                   onChange={updateDate}
                   serviceDuration={selectedService.durationMinutes}
                   availabilityByDate={
-                    calendarLoading
-                      ? undefined
-                      : dateAvailability || {}
+                    calendarLoading ? undefined : dateAvailability || {}
                   }
                   availabilityLoading={calendarLoading}
                 />
@@ -473,7 +474,10 @@ function StaffBookingPage() {
                 <p className="staff-booking__availability-note">
                   Choose a green time. Muted times are unavailable and show why.
                 </p>
-                <ul className="staff-booking__availability-legend" aria-label="Time slot availability">
+                <ul
+                  className="staff-booking__availability-legend"
+                  aria-label="Time slot availability"
+                >
                   <li>
                     <span className="is-available" aria-hidden="true" />
                     Available

@@ -139,6 +139,21 @@ function UserMenu() {
     }
   };
 
+  const openNotification = async (notification) => {
+    if (!notification?._id) return;
+
+    await markNotificationRead(notification._id);
+    setNotificationsOpen(false);
+
+    const appointmentId =
+      typeof notification.appointment === "string"
+        ? notification.appointment
+        : notification.appointment?._id;
+    if (appointmentId) {
+      navigate(`/appointments/${appointmentId}`);
+    }
+  };
+
   const markAllNotificationsRead = async () => {
     if (!token) return;
 
@@ -215,7 +230,7 @@ function UserMenu() {
                       <button
                         className="salon-notification-item"
                         type="button"
-                        onClick={() => markNotificationRead(notification._id)}
+                        onClick={() => openNotification(notification)}
                       >
                         <span className="salon-notification-title">
                           {notification.title || "Appointment update"}
@@ -271,7 +286,11 @@ function UserMenu() {
             tabIndex={-1}
             onClick={() => setOpen(false)}
           >
-            {isCustomer ? "Dashboard" : "Admin Dashboard"}
+            {isCustomer
+              ? "Dashboard"
+              : user?.role === "staff"
+                ? "Staff Dashboard"
+                : "Admin Dashboard"}
           </NavLink>
           {isCustomer && (
             <>

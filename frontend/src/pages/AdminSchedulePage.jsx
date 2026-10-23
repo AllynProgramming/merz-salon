@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
+import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
 import { cancelStaffAppointment } from "../services/bookingApi.js";
 import { formatPrice } from "../components/booking/bookingUtils.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
+import { getDashboardPath } from "../utils/accountRole.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import "../styles/staff-reschedule.css";
@@ -160,6 +162,7 @@ function AdminSchedulePage() {
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [workingHours, setWorkingHours] = useState(defaultWorkingHours);
   const [savingHours, setSavingHours] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
   const calendarDays = getCalendarDays(viewMonth);
   const weekDays = getWeekDays(dateFromKey(selectedDate));
   const rangeStart =
@@ -291,16 +294,21 @@ function AdminSchedulePage() {
     setError("");
 
     try {
-      const response = await fetch(`/api/staff/appointments/${appointmentId}/confirm`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/staff/appointments/${appointmentId}/confirm`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload.message || "Could not confirm this appointment.");
+        throw new Error(
+          payload.message || "Could not confirm this appointment.",
+        );
       }
       setRefreshVersion((version) => version + 1);
     } catch (requestError) {
@@ -355,7 +363,9 @@ function AdminSchedulePage() {
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload.message || "Could not assign this appointment.");
+        throw new Error(
+          payload.message || "Could not assign this appointment.",
+        );
       }
       setAppointments((current) =>
         current.map((appointment) =>
@@ -385,6 +395,7 @@ function AdminSchedulePage() {
 
   const selectStaff = (staffId) => {
     setSelectedStaffId(staffId);
+    setHoursSaved(false);
     setWorkingHours(
       workingHoursForStaff(staff.find((member) => member._id === staffId)),
     );
@@ -395,6 +406,7 @@ function AdminSchedulePage() {
     if (!selectedStaffId) return;
     setSavingHours(true);
     setError("");
+    setHoursSaved(false);
     try {
       const response = await fetch(
         `/api/admin/staff/${selectedStaffId}/working-hours`,
@@ -416,6 +428,7 @@ function AdminSchedulePage() {
           member._id === selectedStaffId ? payload.staff : member,
         ),
       );
+      setHoursSaved(true);
     } catch (requestError) {
       setError(requestError.message || "Could not save working hours.");
     } finally {
@@ -434,12 +447,15 @@ function AdminSchedulePage() {
           <div>
             <p className="customer-eyebrow">Schedule management</p>
             <h1>Manage Schedule</h1>
-            <p className="customer-lede">Appointments arranged by date and time.</p>
+            <p className="customer-lede">
+              Appointments arranged by date and time.
+            </p>
           </div>
           <div className="admin-schedule__heading-actions">
+            <StaffNotificationBell />
             <Link
               className="customer-button customer-button-outline"
-              to="/admin"
+              to={getDashboardPath(user?.role) || "/"}
             >
               Back to dashboard
             </Link>
@@ -449,8 +465,8 @@ function AdminSchedulePage() {
         {["staff", "admin"].includes(user?.role) && (
           <p className="admin-schedule__staff-note">
             You can cancel pending or confirmed appointments before their
-            scheduled start time. Pending bookings stay held briefly after
-            their start while you confirm them. Customers are notified when you
+            scheduled start time. Pending bookings stay held briefly after their
+            start while you confirm them. Customers are notified when you
             cancel.
           </p>
         )}
@@ -482,7 +498,10 @@ function AdminSchedulePage() {
                 their availability.
               </p>
             ) : (
-              <form className="admin-schedule__hours-form" onSubmit={saveWorkingHours}>
+              <form
+                className="admin-schedule__hours-form"
+                onSubmit={saveWorkingHours}
+              >
                 <label className="admin-schedule__staff-select">
                   <span>Staff member</span>
                   <select
@@ -559,6 +578,11 @@ function AdminSchedulePage() {
                 >
                   {savingHours ? "Saving hours..." : "Save working hours"}
                 </button>
+                {hoursSaved && (
+                  <p className="admin-schedule__hours-saved" role="status">
+                    Working hours saved.
+                  </p>
+                )}
               </form>
             )}
           </section>
@@ -574,16 +598,14 @@ function AdminSchedulePage() {
                 <button
                   type="button"
                   className="admin-schedule__month-nav"
-                  aria-label={viewMode === "month" ? "Previous month" : "Previous week"}
+                  aria-label={
+                    viewMode === "month" ? "Previous month" : "Previous week"
+                  }
                   onClick={() =>
                     viewMode === "month" ? changeMonth(-1) : changeWeek(-1)
                   }
                 >
-                  <svg
-                    aria-hidden="true"
-                    focusable="false"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
                     <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
                   </svg>
                 </button>
@@ -602,11 +624,7 @@ function AdminSchedulePage() {
                     viewMode === "month" ? changeMonth(1) : changeWeek(1)
                   }
                 >
-                  <svg
-                    aria-hidden="true"
-                    focusable="false"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
                     <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />
                   </svg>
                 </button>
@@ -650,7 +668,8 @@ function AdminSchedulePage() {
                 {calendarDays.map((date) => {
                   const key = dateKey(date);
                   const dayAppointments = appointmentsByDate.get(key) || [];
-                  const isCurrentMonth = date.getMonth() === viewMonth.getMonth();
+                  const isCurrentMonth =
+                    date.getMonth() === viewMonth.getMonth();
                   const isToday = key === dateKey(new Date());
                   const isSelected = key === selectedDate;
 
@@ -672,7 +691,10 @@ function AdminSchedulePage() {
                 })}
               </div>
             ) : (
-              <div className="admin-schedule__week" aria-label="Appointments this week">
+              <div
+                className="admin-schedule__week"
+                aria-label="Appointments this week"
+              >
                 {weekDays.map((date) => {
                   const key = dateKey(date);
                   const dayAppointments = appointmentsByDate.get(key) || [];
@@ -699,7 +721,10 @@ function AdminSchedulePage() {
                           </span>
                         </div>
                         <span>
-                          {dayAppointments.length} {dayAppointments.length === 1 ? "appointment" : "appointments"}
+                          {dayAppointments.length}{" "}
+                          {dayAppointments.length === 1
+                            ? "appointment"
+                            : "appointments"}
                         </span>
                       </header>
                       {dayAppointments.length === 0 ? (
@@ -714,9 +739,13 @@ function AdminSchedulePage() {
                               className="admin-schedule__appointment"
                             >
                               <div className="admin-schedule__appointment-time">
-                                <strong>{formatTime(appointment.startTime)}</strong>
+                                <strong>
+                                  {formatTime(appointment.startTime)}
+                                </strong>
                                 {appointment.endTime && (
-                                  <span>Until {formatTime(appointment.endTime)}</span>
+                                  <span>
+                                    Until {formatTime(appointment.endTime)}
+                                  </span>
                                 )}
                               </div>
                               <div className="admin-schedule__appointment-details">
@@ -796,20 +825,20 @@ function AdminSchedulePage() {
                                   (user?.role === "admin" ||
                                     !appointment.staffId ||
                                     appointment.staffId === user?._id) && (
-                                  <button
-                                    type="button"
-                                    className="customer-button customer-button-primary"
-                                    onClick={() =>
-                                      confirmAppointment(appointment._id)
-                                    }
-                                    disabled={busyId === appointment._id}
-                                  >
-                                    {busyId === appointment._id &&
-                                    busyAction === "confirm"
-                                      ? "Confirming..."
-                                      : "Confirm"}
-                                  </button>
-                                )}
+                                    <button
+                                      type="button"
+                                      className="customer-button customer-button-primary"
+                                      onClick={() =>
+                                        confirmAppointment(appointment._id)
+                                      }
+                                      disabled={busyId === appointment._id}
+                                    >
+                                      {busyId === appointment._id &&
+                                      busyAction === "confirm"
+                                        ? "Confirming..."
+                                        : "Confirm"}
+                                    </button>
+                                  )}
                                 {appointment.canStaffCancel && (
                                   <button
                                     type="button"
@@ -850,140 +879,144 @@ function AdminSchedulePage() {
 
           {viewMode === "month" && (
             <div className="admin-schedule__agenda">
-            <div className="customer-panel-header admin-schedule__agenda-header">
-              <div>
-                <p className="customer-eyebrow">Daily agenda</p>
-                <h2>{selectedDateLabel}</h2>
+              <div className="customer-panel-header admin-schedule__agenda-header">
+                <div>
+                  <p className="customer-eyebrow">Daily agenda</p>
+                  <h2>{selectedDateLabel}</h2>
+                </div>
+                <span>{selectedAppointments.length} bookings</span>
               </div>
-              <span>{selectedAppointments.length} bookings</span>
-            </div>
 
-            {loading ? (
-              <p role="status">Loading appointments...</p>
-            ) : selectedAppointments.length === 0 ? (
-              <p className="customer-empty-state">
-                No appointments scheduled for this date.
-              </p>
-            ) : (
-              <div className="admin-schedule__list">
-                {selectedAppointments.map((appointment) => (
-                  <article
-                    key={appointment._id}
-                    className="admin-schedule__appointment"
-                  >
-                    <div className="admin-schedule__appointment-time">
-                      <strong>{formatTime(appointment.startTime)}</strong>
-                      {appointment.endTime && (
-                        <span>Until {formatTime(appointment.endTime)}</span>
-                      )}
-                    </div>
-                    <div className="admin-schedule__appointment-details">
-                      <strong>{appointment.serviceName || "Salon service"}</strong>
-                      <span>{appointment.customerName || "Customer"}</span>
-                      {appointment.staffName && (
-                        <span>Staff: {appointment.staffName}</span>
-                      )}
-                    </div>
-                    <div className="admin-schedule__appointment-actions">
-                      <StatusBadge status={appointment.status} />
-                      <button
-                        type="button"
-                        className="customer-button customer-button-outline admin-schedule__details-toggle"
-                        aria-expanded={
-                          detailsAppointmentId === appointment._id
-                        }
-                        aria-controls={`appointment-meta-${appointment._id}`}
-                        onClick={() =>
-                          setDetailsAppointmentId((currentId) =>
-                            currentId === appointment._id
-                              ? ""
-                              : appointment._id,
-                          )
-                        }
-                      >
-                        {detailsAppointmentId === appointment._id
-                          ? "Hide details"
-                          : "Details"}
-                      </button>
-                      {["pending", "confirmed"].includes(
-                        appointment.status,
-                      ) && (
+              {loading ? (
+                <p role="status">Loading appointments...</p>
+              ) : selectedAppointments.length === 0 ? (
+                <p className="customer-empty-state">
+                  No appointments scheduled for this date.
+                </p>
+              ) : (
+                <div className="admin-schedule__list">
+                  {selectedAppointments.map((appointment) => (
+                    <article
+                      key={appointment._id}
+                      className="admin-schedule__appointment"
+                    >
+                      <div className="admin-schedule__appointment-time">
+                        <strong>{formatTime(appointment.startTime)}</strong>
+                        {appointment.endTime && (
+                          <span>Until {formatTime(appointment.endTime)}</span>
+                        )}
+                      </div>
+                      <div className="admin-schedule__appointment-details">
+                        <strong>
+                          {appointment.serviceName || "Salon service"}
+                        </strong>
+                        <span>{appointment.customerName || "Customer"}</span>
+                        {appointment.staffName && (
+                          <span>Staff: {appointment.staffName}</span>
+                        )}
+                      </div>
+                      <div className="admin-schedule__appointment-actions">
+                        <StatusBadge status={appointment.status} />
                         <button
                           type="button"
-                          className="customer-button customer-button-outline admin-schedule__reschedule"
-                          onClick={() =>
-                            setReschedulingAppointment(appointment)
+                          className="customer-button customer-button-outline admin-schedule__details-toggle"
+                          aria-expanded={
+                            detailsAppointmentId === appointment._id
                           }
-                        >
-                          Reschedule
-                        </button>
-                      )}
-                      {user?.role === "admin" && (
-                        <select
-                          className="admin-schedule__assign-select"
-                          aria-label={`Assign staff for ${appointment.customerName || "appointment"} at ${formatTime(appointment.startTime)}`}
-                          value={appointment.staffId || ""}
-                          disabled={
-                            assigningId === appointment._id ||
-                            staff.length === 0 ||
-                            !["pending", "confirmed"].includes(
-                              appointment.status,
+                          aria-controls={`appointment-meta-${appointment._id}`}
+                          onClick={() =>
+                            setDetailsAppointmentId((currentId) =>
+                              currentId === appointment._id
+                                ? ""
+                                : appointment._id,
                             )
                           }
-                          onChange={(event) =>
-                            assignStaff(appointment._id, event.target.value)
-                          }
                         >
-                          <option value="">Unassigned</option>
-                          {staff.map((member) => (
-                            <option key={member._id} value={member._id}>
-                              {member.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      {appointment.status === "pending" &&
-                        (user?.role === "admin" ||
-                          !appointment.staffId ||
-                          appointment.staffId === user?._id) && (
-                        <button
-                          type="button"
-                          className="customer-button customer-button-primary"
-                          onClick={() => confirmAppointment(appointment._id)}
-                          disabled={busyId === appointment._id}
-                        >
-                          {busyId === appointment._id &&
-                          busyAction === "confirm"
-                            ? "Confirming..."
-                            : "Confirm"}
+                          {detailsAppointmentId === appointment._id
+                            ? "Hide details"
+                            : "Details"}
                         </button>
+                        {["pending", "confirmed"].includes(
+                          appointment.status,
+                        ) && (
+                          <button
+                            type="button"
+                            className="customer-button customer-button-outline admin-schedule__reschedule"
+                            onClick={() =>
+                              setReschedulingAppointment(appointment)
+                            }
+                          >
+                            Reschedule
+                          </button>
+                        )}
+                        {user?.role === "admin" && (
+                          <select
+                            className="admin-schedule__assign-select"
+                            aria-label={`Assign staff for ${appointment.customerName || "appointment"} at ${formatTime(appointment.startTime)}`}
+                            value={appointment.staffId || ""}
+                            disabled={
+                              assigningId === appointment._id ||
+                              staff.length === 0 ||
+                              !["pending", "confirmed"].includes(
+                                appointment.status,
+                              )
+                            }
+                            onChange={(event) =>
+                              assignStaff(appointment._id, event.target.value)
+                            }
+                          >
+                            <option value="">Unassigned</option>
+                            {staff.map((member) => (
+                              <option key={member._id} value={member._id}>
+                                {member.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {appointment.status === "pending" &&
+                          (user?.role === "admin" ||
+                            !appointment.staffId ||
+                            appointment.staffId === user?._id) && (
+                            <button
+                              type="button"
+                              className="customer-button customer-button-primary"
+                              onClick={() =>
+                                confirmAppointment(appointment._id)
+                              }
+                              disabled={busyId === appointment._id}
+                            >
+                              {busyId === appointment._id &&
+                              busyAction === "confirm"
+                                ? "Confirming..."
+                                : "Confirm"}
+                            </button>
+                          )}
+                        {["pending", "confirmed"].includes(
+                          appointment.status,
+                        ) && (
+                          <button
+                            type="button"
+                            className="customer-button customer-button-outline admin-schedule__cancel"
+                            onClick={() => cancelAppointment(appointment._id)}
+                            disabled={busyId === appointment._id}
+                          >
+                            {busyId === appointment._id &&
+                            busyAction === "cancel"
+                              ? "Cancelling..."
+                              : "Cancel"}
+                          </button>
+                        )}
+                      </div>
+                      {detailsAppointmentId === appointment._id && (
+                        <AppointmentMeta
+                          appointment={appointment}
+                          id={`appointment-meta-${appointment._id}`}
+                        />
                       )}
-                      {["pending", "confirmed"].includes(
-                        appointment.status,
-                      ) && (
-                        <button
-                          type="button"
-                          className="customer-button customer-button-outline admin-schedule__cancel"
-                          onClick={() => cancelAppointment(appointment._id)}
-                          disabled={busyId === appointment._id}
-                        >
-                          {busyId === appointment._id &&
-                          busyAction === "cancel"
-                            ? "Cancelling..."
-                            : "Cancel"}
-                        </button>
-                      )}
-                    </div>
-                    {detailsAppointmentId === appointment._id && (
-                      <AppointmentMeta
-                        appointment={appointment}
-                        id={`appointment-meta-${appointment._id}`}
-                      />
-                    )}
-                  </article>
-                ))}
-              </div>
-            )}
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>

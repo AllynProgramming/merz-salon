@@ -20,6 +20,14 @@ export const salonSchedule = {
   timezone: process.env.SALON_TIMEZONE || "Asia/Manila",
 };
 
+export const getDefaultWorkingHours = () =>
+  Array.from({ length: 7 }, (_, weekday) => ({
+    weekday,
+    enabled: !salonSchedule.closedWeekdays.includes(weekday),
+    startTime: salonSchedule.openingTime,
+    endTime: salonSchedule.closingTime,
+  }));
+
 export const reminderWindowHours = {
   default: Number(process.env.REMINDER_HOURS_BEFORE || 24),
   secondary: Number(process.env.REMINDER_SECONDARY_HOURS_BEFORE || 2),
