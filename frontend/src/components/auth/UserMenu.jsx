@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth.js";
 import { getDashboardPath } from "../../utils/accountRole.js";
@@ -14,6 +14,7 @@ function UserMenu() {
   const [loggingOut, setLoggingOut] = useState(false);
   const triggerRef = useRef(null);
   const itemRefs = useRef([]);
+
   const fullName =
     user?.name ||
     [user?.firstname, user?.lastname].filter(Boolean).join(" ") ||
@@ -26,7 +27,7 @@ function UserMenu() {
     .join("")
     .toUpperCase();
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!token) return;
 
     setLoadingNotifications(true);
@@ -56,21 +57,27 @@ function UserMenu() {
     } finally {
       setLoadingNotifications(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    if (open) itemRefs.current[0]?.focus();
+    if (open) {
+      itemRefs.current[0]?.focus();
+    }
   }, [open]);
 
   useEffect(() => {
-    if (token) {
-      loadNotifications();
-    } else {
-      setNotifications([]);
-      setUnreadCount(0);
-      setNotificationsOpen(false);
+    if (!token) {
+      return;
     }
-  }, [token]);
+
+    const timeoutId = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [loadNotifications, token]);
 
   const handleMenuKeyDown = (event) => {
     const items = itemRefs.current.filter(Boolean);
@@ -106,6 +113,8 @@ function UserMenu() {
       // The context clears the local token even if the logout request is offline.
     } finally {
       setOpen(false);
+      setNotifications([]);
+      setUnreadCount(0);
       setNotificationsOpen(false);
       navigate("/login", {
         replace: true,

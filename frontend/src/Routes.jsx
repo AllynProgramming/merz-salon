@@ -19,6 +19,7 @@ import AdminReportsPage from "./pages/AdminReportsPage.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx";
 import StaffServicesPage from "./pages/StaffServicesPage.jsx";
 import StaffBookingPage from "./pages/StaffBookingPage.jsx";
+import StaffBookingSuccessPage from "./pages/StaffBookingSuccessPage.jsx";
 import AdminSettingsPage from "./pages/AdminSettingsPage.jsx";
 import GoogleCallbackPage from "./pages/GoogleCallbackPage.jsx";
 import StaffChangePasswordPage from "./pages/StaffChangePasswordPage.jsx";
@@ -52,6 +53,10 @@ function Routes() {
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
         { path: "/staff/services", element: <StaffServicesPage /> },
         { path: "/staff/book-appointment", element: <StaffBookingPage /> },
+        {
+          path: "/staff/book-appointment/:id/success",
+          element: <StaffBookingSuccessPage />,
+        },
       ],
     },
     {

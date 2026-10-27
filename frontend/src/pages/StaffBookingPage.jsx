@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import {
   formatDuration,
@@ -45,15 +45,9 @@ function formatTime(value) {
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
-function formatDate(value) {
-  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(
-    new Date(year, month - 1, day),
-  );
-}
-
 function StaffBookingPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
@@ -61,11 +55,16 @@ function StaffBookingPage() {
   const [customers, setCustomers] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [customersLoading, setCustomersLoading] = useState(false);
+  const [walkInMode, setWalkInMode] = useState(false);
+  const [walkInCustomer, setWalkInCustomer] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  });
   const [serviceId, setServiceId] = useState("");
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [slotRefresh, setSlotRefresh] = useState(0);
   const [dateAvailability, setDateAvailability] = useState(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarError, setCalendarError] = useState("");
@@ -73,7 +72,6 @@ function StaffBookingPage() {
   const [startTime, setStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -185,7 +183,7 @@ function StaffBookingPage() {
     return () => {
       active = false;
     };
-  }, [serviceId, date, token, slotRefresh]);
+  }, [serviceId, date, token]);
 
   const selectedService = services.find((service) => service._id === serviceId);
 
@@ -196,7 +194,12 @@ function StaffBookingPage() {
     setCustomers([]);
     setCustomersLoading(value.trim().length >= 2);
     setError("");
-    setResult(null);
+  };
+
+  const updateWalkInCustomer = (event) => {
+    const { name, value } = event.target;
+    setWalkInCustomer((current) => ({ ...current, [name]: value }));
+    setError("");
   };
 
   const updateService = (event) => {
@@ -209,7 +212,6 @@ function StaffBookingPage() {
     setCalendarLoading(Boolean(value));
     setCalendarError("");
     setError("");
-    setResult(null);
   };
 
   const updateDate = (value) => {
@@ -218,38 +220,91 @@ function StaffBookingPage() {
     setStartTime("");
     setAvailabilityLoading(Boolean(value && serviceId));
     setError("");
-    setResult(null);
   };
+
+  const walkInReady =
+    walkInMode &&
+    walkInCustomer.name.trim().length >= 2 &&
+    walkInCustomer.phone.trim().length >= 7;
+  const customerReady = !walkInMode && Boolean(customer);
+  const isFormReady =
+    Boolean(walkInReady || customerReady) &&
+    Boolean(serviceId) &&
+    Boolean(date) &&
+    Boolean(startTime);
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!customer || !serviceId || !date || !startTime) {
-      setError("Choose a customer, service, date, and available time.");
+
+    if (walkInMode) {
+      if (!walkInCustomer.name.trim() || walkInCustomer.name.trim().length < 2) {
+        setError(
+          "Please enter the walk-in customer's full name (at least 2 characters).",
+        );
+        return;
+      }
+      if (
+        !walkInCustomer.phone.trim() ||
+        walkInCustomer.phone.trim().length < 7
+      ) {
+        setError(
+          "Please enter a valid contact phone number (at least 7 characters).",
+        );
+        return;
+      }
+    } else if (!customer) {
+      setError(
+        "Please search and select a customer, or switch to Walk-in customer mode.",
+      );
+      return;
+    }
+
+    if (!serviceId) {
+      setError("Please select a salon service.");
+      return;
+    }
+    if (!date) {
+      setError("Please select an appointment date.");
+      return;
+    }
+    if (!startTime) {
+      setError("Please select an available appointment time.");
       return;
     }
 
     setSubmitting(true);
     setError("");
-    setResult(null);
     try {
-      const response = await createStaffAppointment(
+      const payload = walkInMode
+        ? {
+            walkInCustomer: {
+              name: walkInCustomer.name.trim(),
+              phone: walkInCustomer.phone.trim(),
+              email: walkInCustomer.email.trim(),
+            },
+            serviceId,
+            date,
+            startTime,
+          }
+        : {
+            customerId: customer._id,
+            serviceId,
+            date,
+            startTime,
+          };
+
+      const response = await createStaffAppointment(payload, token);
+      navigate(
+        `/staff/book-appointment/${response.appointment._id}/success`,
         {
-          customerId: customer._id,
-          serviceId,
-          date,
-          startTime,
+          state: {
+            appointment: {
+              ...response.appointment,
+              isWalkIn: walkInMode,
+            },
+          },
         },
-        token,
       );
-      setResult(response.appointment);
-      setStartTime("");
-      setSlots([]);
-      setAvailabilityLoading(true);
-      setDateAvailability(null);
-      setCalendarLoading(true);
-      setCalendarError("");
-      setSlotRefresh((version) => version + 1);
-      setCalendarRefresh((version) => version + 1);
     } catch (requestError) {
       setError(
         requestError.message ||
@@ -272,8 +327,8 @@ function StaffBookingPage() {
             <p className="booking-eyebrow">Salon operations</p>
             <h1>Book for a Customer</h1>
             <p className="booking-lede">
-              Choose an existing customer, service, and an available appointment
-              time.
+              Choose an existing customer or book a walk-in guest, then select a
+              service and appointment time.
             </p>
           </div>
           <Link className="customer-button customer-button-outline" to="/staff">
@@ -286,56 +341,6 @@ function StaffBookingPage() {
             {error}
           </div>
         )}
-        {result && (
-          <div className="staff-booking__success" role="status">
-            <div className="staff-booking__success-heading">
-              <svg
-                className="staff-booking__success-icon"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <circle cx="10" cy="10" r="8.25" />
-                <path d="m6.5 10 2.25 2.25 4.75-5" />
-              </svg>
-              <strong>Appointment confirmed</strong>
-            </div>
-            <p>
-              The appointment is confirmed and the customer has been notified.
-            </p>
-            <dl className="staff-booking__confirmation-details">
-              <div>
-                <dt>Customer</dt>
-                <dd>{customer?.name || "Customer"}</dd>
-              </div>
-              <div>
-                <dt>Service</dt>
-                <dd>{result.serviceName}</dd>
-              </div>
-              <div>
-                <dt>Date and time</dt>
-                <dd>
-                  {formatDate(result.date)} · {formatTime(result.startTime)}
-                  {result.endTime && `–${formatTime(result.endTime)}`}
-                </dd>
-              </div>
-              {result.staffName && (
-                <div>
-                  <dt>Staff</dt>
-                  <dd>{result.staffName}</dd>
-                </div>
-              )}
-              <div>
-                <dt>Booking reference</dt>
-                <dd>{result.bookingReference}</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>Confirmed</dd>
-              </div>
-            </dl>
-          </div>
-        )}
         {servicesError && (
           <div className="booking-state booking-state-error" role="alert">
             {servicesError}
@@ -344,52 +349,263 @@ function StaffBookingPage() {
 
         <form className="staff-booking__form" onSubmit={submit}>
           <section className="customer-panel staff-booking__panel">
-            <h2>1. Choose a customer</h2>
-            <label className="staff-booking__field">
-              <span>Search by name, email, or phone</span>
-              <input
-                type="search"
-                value={customerSearch}
-                onChange={updateCustomerSearch}
-                placeholder="Enter at least 2 characters"
-                autoComplete="off"
-              />
-            </label>
-            {customer && (
-              <div className="staff-booking__selected-customer">
-                <strong>{customer.name}</strong>
-                <span>{customer.email}</span>
-                {customer.phone && <span>{customer.phone}</span>}
+            <div className="staff-booking__panel-header">
+              <h2>1. Customer details</h2>
+              <div
+                className="staff-booking__type-toggle"
+                role="radiogroup"
+                aria-label="Customer booking type"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!walkInMode}
+                  className={`staff-booking__type-btn${!walkInMode ? " is-active" : ""}`}
+                  onClick={() => {
+                    if (walkInMode) {
+                      setWalkInMode(false);
+                      setError("");
+                    }
+                  }}
+                >
+                  <svg
+                    className="staff-booking__tab-icon"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M16 17v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 15.5V17" />
+                    <circle cx="10" cy="7" r="3.5" />
+                  </svg>
+                  Registered Account
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={walkInMode}
+                  className={`staff-booking__type-btn${walkInMode ? " is-active" : ""}`}
+                  onClick={() => {
+                    if (!walkInMode) {
+                      setWalkInMode(true);
+                      setCustomer(null);
+                      setCustomerSearch("");
+                      setCustomers([]);
+                      setError("");
+                    }
+                  }}
+                >
+                  <svg
+                    className="staff-booking__tab-icon"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M13 17v-2a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v2" />
+                    <circle cx="8" cy="7" r="3" />
+                    <line x1="16" y1="8" x2="16" y2="14" />
+                    <line x1="13" y1="11" x2="19" y2="11" />
+                  </svg>
+                  Walk-in (No Account)
+                </button>
               </div>
-            )}
-            {!customer && customersLoading && (
-              <p role="status">Searching customers…</p>
-            )}
-            {!customer &&
-              !customersLoading &&
-              customerSearch.trim().length >= 2 && (
-                <div className="staff-booking__customer-results">
-                  {customers.length ? (
-                    customers.map((item) => (
+            </div>
+
+            {!walkInMode ? (
+              <>
+                <label className="staff-booking__field">
+                  <span>Search customer by name, email, or phone</span>
+                  <div className="staff-booking__input-wrap">
+                    <input
+                      type="search"
+                      value={customerSearch}
+                      onChange={updateCustomerSearch}
+                      placeholder="Enter at least 2 characters to search"
+                      autoComplete="off"
+                    />
+                    {customerSearch && (
                       <button
                         type="button"
-                        key={item._id}
+                        className="staff-booking__input-clear"
                         onClick={() => {
-                          setCustomer(item);
-                          setCustomerSearch(item.name);
-                          setError("");
+                          setCustomerSearch("");
+                          setCustomer(null);
+                          setCustomers([]);
                         }}
+                        aria-label="Clear customer search"
                       >
-                        <strong>{item.name}</strong>
-                        <span>{item.email}</span>
-                        {item.phone && <span>{item.phone}</span>}
+                        ×
                       </button>
-                    ))
-                  ) : (
-                    <p>No customer accounts found.</p>
+                    )}
+                  </div>
+                </label>
+                {customer && (
+                  <div className="staff-booking__selected-customer">
+                    <div className="staff-booking__selected-customer-info">
+                      <strong>{customer.name}</strong>
+                      <span>{customer.email}</span>
+                      {customer.phone && <span>{customer.phone}</span>}
+                    </div>
+                    <button
+                      type="button"
+                      className="customer-button customer-button-outline staff-booking__change-btn"
+                      onClick={() => {
+                        setCustomer(null);
+                        setCustomerSearch("");
+                        setCustomers([]);
+                      }}
+                    >
+                      Change customer
+                    </button>
+                  </div>
+                )}
+                {!customer && customersLoading && (
+                  <p className="staff-booking__status-text" role="status">
+                    Searching customers…
+                  </p>
+                )}
+                {!customer &&
+                  !customersLoading &&
+                  customerSearch.trim().length >= 2 && (
+                    <div className="staff-booking__customer-results">
+                      {customers.length ? (
+                        customers.map((item) => (
+                          <button
+                            type="button"
+                            key={item._id}
+                            onClick={() => {
+                              setCustomer(item);
+                              setCustomerSearch(item.name);
+                              setError("");
+                            }}
+                          >
+                            <strong>{item.name}</strong>
+                            <span>{item.email}</span>
+                            {item.phone && <span>{item.phone}</span>}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="staff-booking__no-results">
+                          <p>
+                            No customer accounts found for "
+                            {customerSearch.trim()}".
+                          </p>
+                          <button
+                            type="button"
+                            className="customer-button customer-button-outline staff-booking__switch-walkin-btn"
+                            onClick={() => {
+                              setWalkInMode(true);
+                              const trimmed = customerSearch.trim();
+                              const isPhone = /^[\d\s+\-()]+$/.test(trimmed);
+                              const isEmail = trimmed.includes("@");
+                              setWalkInCustomer((prev) => ({
+                                ...prev,
+                                name:
+                                  !isPhone && !isEmail ? trimmed : prev.name,
+                                phone: isPhone ? trimmed : prev.phone,
+                                email: isEmail ? trimmed : prev.email,
+                              }));
+                              setCustomerSearch("");
+                              setCustomers([]);
+                              setError("");
+                            }}
+                          >
+                            Book as Walk-in Customer instead
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
+              </>
+            ) : (
+              <div className="staff-booking__walkin-container">
+                <div className="staff-booking__walkin-notice">
+                  <svg
+                    className="staff-booking__walkin-notice-icon"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="10" cy="10" r="9" />
+                    <line x1="10" y1="8" x2="10" y2="14" />
+                    <line
+                      x1="10"
+                      y1="5.5"
+                      x2="10.01"
+                      y2="5.5"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
+                  <div>
+                    <strong>Walk-in guest (no account needed)</strong>
+                    <p>
+                      Enter the guest's contact information below to schedule
+                      and confirm their salon appointment.
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                <div className="staff-booking__walkin-grid">
+                  <label className="staff-booking__field">
+                    <span>
+                      Guest full name{" "}
+                      <strong className="staff-booking__req">*</strong>
+                    </span>
+                    <input
+                      type="text"
+                      name="name"
+                      value={walkInCustomer.name}
+                      onChange={updateWalkInCustomer}
+                      placeholder="e.g. Maria Santos"
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+
+                  <label className="staff-booking__field">
+                    <span>
+                      Phone number{" "}
+                      <strong className="staff-booking__req">*</strong>
+                    </span>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={walkInCustomer.phone}
+                      onChange={updateWalkInCustomer}
+                      placeholder="e.g. 0917 123 4567"
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+                </div>
+
+                <label className="staff-booking__field">
+                  <span>
+                    Email address{" "}
+                    <small>(Optional – for appointment updates)</small>
+                  </span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={walkInCustomer.email}
+                    onChange={updateWalkInCustomer}
+                    placeholder="e.g. guest@example.com"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+            )}
           </section>
 
           <section className="customer-panel staff-booking__panel">
@@ -503,7 +719,6 @@ function StaffBookingPage() {
                         onChange={() => {
                           setStartTime(slot.startTime);
                           setError("");
-                          setResult(null);
                         }}
                       />
                       <span>{formatTime(slot.startTime)}</span>
@@ -529,13 +744,14 @@ function StaffBookingPage() {
                 submitting ||
                 servicesLoading ||
                 availabilityLoading ||
-                !customer ||
-                !serviceId ||
-                !date ||
-                !startTime
+                !isFormReady
               }
             >
-              {submitting ? "Booking…" : "Book appointment"}
+              {submitting
+                ? "Booking…"
+                : walkInMode
+                  ? "Book Walk-In Appointment"
+                  : "Book Appointment"}
             </button>
           </div>
         </form>

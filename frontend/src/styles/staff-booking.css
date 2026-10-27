@@ -307,7 +307,231 @@
   font-weight: 650;
 }
 
+.staff-booking__panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.staff-booking__panel-header h2 {
+  margin: 0;
+}
+
+.staff-booking__type-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 8px;
+  background: #e9f0e8;
+  gap: 4px;
+}
+
+.staff-booking__type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #354e3c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.staff-booking__type-btn:hover {
+  color: #183d2c;
+  background: rgba(32, 86, 56, 0.08);
+}
+
+.staff-booking__type-btn.is-active {
+  background: #205638;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.staff-booking__tab-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.staff-booking__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.staff-booking__input-wrap input {
+  padding-right: 36px;
+}
+
+.staff-booking__input-clear {
+  position: absolute;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #718175;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.staff-booking__input-clear:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #183d2c;
+}
+
+.staff-booking__status-text {
+  margin: 10px 0 0;
+  color: #52695a;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.staff-booking__selected-customer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.staff-booking__selected-customer-info {
+  display: grid;
+  gap: 4px;
+}
+
+.staff-booking__change-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.staff-booking__no-results {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+}
+
+.staff-booking__no-results p {
+  margin: 0;
+  color: #718175;
+  font-size: 13px;
+}
+
+.staff-booking__switch-walkin-btn {
+  justify-self: center;
+  font-size: 13px;
+}
+
+.staff-booking__walkin-container {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.staff-booking__walkin-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(32, 86, 56, 0.2);
+  border-radius: 4px;
+  background: #f4f8f3;
+  color: #183d2c;
+  font-size: 13px;
+}
+
+.staff-booking__walkin-notice-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  stroke: #205638;
+  margin-top: 1px;
+}
+
+.staff-booking__walkin-notice strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #205638;
+}
+
+.staff-booking__walkin-notice p {
+  margin: 0;
+  color: #52695a;
+  line-height: 1.45;
+}
+
+.staff-booking__walkin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.staff-booking__req {
+  color: #ba3232;
+  margin-left: 2px;
+}
+
+.staff-booking__field small {
+  color: #718175;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.staff-booking__walkin-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #205638;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.staff-booking__confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(32, 86, 56, 0.16);
+}
+
 @media (max-width: 640px) {
+  .staff-booking__panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .staff-booking__type-toggle {
+    width: 100%;
+  }
+
+  .staff-booking__type-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .staff-booking__walkin-grid {
+    grid-template-columns: 1fr;
+  }
+
   .staff-booking__service-summary {
     grid-template-columns: 1fr;
   }
@@ -324,4 +548,15 @@
   .staff-booking__confirmation-details {
     grid-template-columns: 1fr;
   }
+
+  .staff-booking__confirmation-actions {
+    flex-direction: column;
+  }
+
+  .staff-booking__confirmation-actions button,
+  .staff-booking__confirmation-actions a {
+    width: 100%;
+    text-align: center;
+  }
 }
+

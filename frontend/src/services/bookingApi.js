@@ -280,6 +280,13 @@ export async function createStaffAppointment(details, token) {
   });
 }
 
+export async function getStaffAppointment(appointmentId, token) {
+  return request(
+    `/api/staff/appointments/${encodeURIComponent(appointmentId)}`,
+    { token },
+  );
+}
+
 export async function cancelStaffAppointment(appointmentId, token) {
   return request(
     `/api/staff/appointments/${encodeURIComponent(appointmentId)}/cancel`,
