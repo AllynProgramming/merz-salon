@@ -6,6 +6,7 @@ import {
   encryptSecret,
   getIntegrationSecrets,
 } from "../utils/integrationSecrets.js";
+import { listGoogleCalendarEvents } from "../services/google-calendar.service.js";
 
 const getGoogleConfig = async () => {
   const secrets = await getIntegrationSecrets(IntegrationSettings);
@@ -110,5 +111,20 @@ export const googleCalendarCallback = async (req, res) => {
     return res.redirect(
       `${frontendUrl()}/admin/settings?calendar_error=connection_failed`,
     );
+  }
+};
+
+export const getGoogleCalendarEvents = async (req, res, next) => {
+  try {
+    const timeMin = new Date(req.query.timeMin).toISOString();
+    const timeMax = new Date(req.query.timeMax).toISOString();
+    if (timeMin >= timeMax) {
+      return res.status(400).json({ message: "Calendar range is invalid." });
+    }
+
+    const calendar = await listGoogleCalendarEvents({ timeMin, timeMax });
+    return res.status(200).json(calendar);
+  } catch (error) {
+    return next(error);
   }
 };

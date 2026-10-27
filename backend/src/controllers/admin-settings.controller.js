@@ -58,19 +58,22 @@ const getSettings = async () =>
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).lean();
 
-const publicSettings = (settings) =>
-  ({
-    ...Object.fromEntries(settingsFields.map((field) => [field, settings[field]])),
-    secretsConfigured: Object.fromEntries(
-      secretFields.map((field) => [field, Boolean(settings[field])]),
-    ),
-    calendarConnected: Boolean(settings.calendarRefreshToken),
-    calendarEmail: settings.calendarEmail || "",
-  });
+const publicSettings = (settings) => ({
+  ...Object.fromEntries(
+    settingsFields.map((field) => [field, settings[field]]),
+  ),
+  secretsConfigured: Object.fromEntries(
+    secretFields.map((field) => [field, Boolean(settings[field])]),
+  ),
+  calendarConnected: Boolean(settings.calendarRefreshToken),
+  calendarEmail: settings.calendarEmail || "",
+});
 
 export const readIntegrationSettings = async (req, res, next) => {
   try {
-    return res.status(200).json({ settings: publicSettings(await getSettings()) });
+    return res
+      .status(200)
+      .json({ settings: publicSettings(await getSettings()) });
   } catch (error) {
     return next(error);
   }
@@ -80,7 +83,8 @@ export const updateIntegrationSettings = async (req, res, next) => {
   const validation = settingsSchema.safeParse(req.body);
   if (!validation.success) {
     return res.status(400).json({
-      message: validation.error.issues[0]?.message || "Invalid integration settings.",
+      message:
+        validation.error.issues[0]?.message || "Invalid integration settings.",
     });
   }
 
@@ -89,7 +93,8 @@ export const updateIntegrationSettings = async (req, res, next) => {
       settingsFields.map((field) => [field, validation.data[field]]),
     );
     for (const field of secretFields) {
-      if (validation.data[field]) update[field] = encryptSecret(validation.data[field]);
+      if (validation.data[field])
+        update[field] = encryptSecret(validation.data[field]);
     }
 
     const settings = await IntegrationSettings.findOneAndUpdate(
@@ -101,7 +106,12 @@ export const updateIntegrationSettings = async (req, res, next) => {
           whatsappNotifications: 1,
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+        runValidators: true,
+      },
     ).lean();
     return res.status(200).json({
       message: "Integration settings saved.",
@@ -129,7 +139,9 @@ export const readPublicIntegrationSettings = async (req, res, next) => {
         : "");
     return res.status(200).json({
       embeddedMaps: settings.embeddedMaps !== false,
+      googleCalendar: settings.googleCalendar === true,
       calendarEmbedUrl,
+      calendarEmbedConfigured: Boolean(settings.calendarEmbedUrl),
     });
   } catch (error) {
     return next(error);

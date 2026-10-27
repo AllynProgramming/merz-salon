@@ -78,6 +78,18 @@ async function fetchAppointments(token, from, to) {
   );
 }
 
+async function fetchGoogleCalendarEvents(token, timeMin, timeMax) {
+  const query = new URLSearchParams({ timeMin, timeMax });
+  const response = await fetch(`/api/admin/calendar/events?${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message || "Could not load Google Calendar.");
+  }
+  return payload;
+}
+
 function formatTime(value) {
   if (!value) return "Time to be confirmed";
   const [hours, minutes] = String(value).split(":").map(Number);
@@ -164,6 +176,13 @@ function AdminSchedulePage() {
   const [workingHours, setWorkingHours] = useState(defaultWorkingHours);
   const [savingHours, setSavingHours] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
+  const [googleCalendar, setGoogleCalendar] = useState({
+    connected: false,
+    events: [],
+  });
+  const [googleCalendarLoading, setGoogleCalendarLoading] = useState(true);
+  const [googleCalendarError, setGoogleCalendarError] = useState("");
+  const [googleCalendarEnabled, setGoogleCalendarEnabled] = useState(false);
   const [calendarEmbedUrl, setCalendarEmbedUrl] = useState("");
   const calendarDays = getCalendarDays(viewMonth);
   const weekDays = getWeekDays(dateFromKey(selectedDate));
@@ -178,7 +197,18 @@ function AdminSchedulePage() {
     appointmentsByDate.set(key, dayAppointments);
   }
 
+  const googleEventsByDate = new Map();
+  for (const event of googleCalendar.events) {
+    const start = event.start?.dateTime || event.start?.date;
+    if (!start) continue;
+    const key = dateKey(new Date(start));
+    const dayEvents = googleEventsByDate.get(key) || [];
+    dayEvents.push(event);
+    googleEventsByDate.set(key, dayEvents);
+  }
+
   const selectedAppointments = appointmentsByDate.get(selectedDate) || [];
+  const selectedGoogleEvents = googleEventsByDate.get(selectedDate) || [];
   const monthLabel = new Intl.DateTimeFormat(undefined, {
     month: "long",
     year: "numeric",
@@ -193,7 +223,15 @@ function AdminSchedulePage() {
     fetch("/api/settings/integrations")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
-        if (active) setCalendarEmbedUrl(payload?.calendarEmbedUrl || "");
+        if (active) {
+          const enabled = payload?.googleCalendar === true;
+          setGoogleCalendarEnabled(enabled);
+          setCalendarEmbedUrl(
+            enabled && payload?.calendarEmbedConfigured
+              ? payload.calendarEmbedUrl || ""
+              : "",
+          );
+        }
       })
       .catch(() => {
         if (active) setCalendarEmbedUrl("");
@@ -202,6 +240,46 @@ function AdminSchedulePage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!token || !googleCalendarEnabled) return undefined;
+    let active = true;
+    const visibleDays =
+      viewMode === "week"
+        ? getWeekDays(dateFromKey(rangeStart))
+        : getCalendarDays(viewMonth);
+    const lastDay = new Date(visibleDays[visibleDays.length - 1]);
+    lastDay.setDate(lastDay.getDate() + 1);
+
+    const loadGoogleCalendar = async () => {
+      setGoogleCalendarLoading(true);
+      setGoogleCalendarError("");
+      try {
+        const payload = await fetchGoogleCalendarEvents(
+          token,
+          new Date(visibleDays[0]).toISOString(),
+          lastDay.toISOString(),
+        );
+        if (active) setGoogleCalendar(payload);
+      } catch (requestError) {
+        if (active) {
+          setGoogleCalendarError(
+            requestError.message || "Could not load Google Calendar.",
+          );
+        }
+      } finally {
+        if (active) setGoogleCalendarLoading(false);
+      }
+    };
+
+    Promise.resolve().then(() => {
+      if (active) loadGoogleCalendar();
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [token, googleCalendarEnabled, viewMonth, viewMode, rangeStart]);
 
   useEffect(() => {
     let active = true;
@@ -606,29 +684,70 @@ function AdminSchedulePage() {
           </section>
         )}
 
-        {calendarEmbedUrl && (
-          <section
-            className="customer-panel admin-schedule__google-calendar"
-            aria-labelledby="google-calendar-heading"
-          >
-            <div className="customer-panel-header">
-              <div>
-                <p className="customer-eyebrow">Google Calendar</p>
-                <h2 id="google-calendar-heading">Salon calendar</h2>
-                <p>
-                  The connected Google Calendar alongside the salon schedule.
-                </p>
+        {googleCalendarEnabled &&
+          (calendarEmbedUrl || googleCalendar.connected) && (
+            <section
+              className="customer-panel admin-schedule__google-calendar"
+              aria-labelledby="google-calendar-heading"
+            >
+              <div className="customer-panel-header">
+                <div>
+                  <p className="customer-eyebrow">Google Calendar</p>
+                  <h2 id="google-calendar-heading">Salon calendar</h2>
+                  <p>Private events from the connected Google Calendar.</p>
+                </div>
               </div>
-            </div>
-            <div className="admin-schedule__google-calendar-frame">
-              <iframe
-                title="Google Calendar for the salon"
-                src={calendarEmbedUrl}
-                loading="lazy"
-              />
-            </div>
-          </section>
-        )}
+              {calendarEmbedUrl ? (
+                <div className="admin-schedule__google-calendar-frame">
+                  <iframe
+                    title="Google Calendar for the salon"
+                    src={calendarEmbedUrl}
+                    loading="lazy"
+                  />
+                </div>
+              ) : googleCalendarLoading ? (
+                <p
+                  className="admin-schedule__google-calendar-status"
+                  role="status"
+                >
+                  Loading Google Calendar…
+                </p>
+              ) : googleCalendarError ? (
+                <p
+                  className="admin-schedule__google-calendar-status"
+                  role="alert"
+                >
+                  {googleCalendarError}
+                </p>
+              ) : googleCalendar.events.length === 0 ? (
+                <p className="admin-schedule__google-calendar-status">
+                  No Google Calendar events in this range.
+                </p>
+              ) : (
+                <div className="admin-schedule__google-calendar-events">
+                  {googleCalendar.events.map((event) => {
+                    const start = event.start?.dateTime || event.start?.date;
+                    return (
+                      <article
+                        key={event.id}
+                        className="admin-schedule__google-calendar-event"
+                      >
+                        <time dateTime={start}>
+                          {new Intl.DateTimeFormat(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: event.start?.dateTime
+                              ? "short"
+                              : undefined,
+                          }).format(new Date(start))}
+                        </time>
+                        <strong>{event.summary || "Untitled event"}</strong>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
         <section
           className={`customer-panel admin-schedule__workspace ${viewMode === "week" ? "is-week-view" : ""}`}
@@ -710,6 +829,9 @@ function AdminSchedulePage() {
                 {calendarDays.map((date) => {
                   const key = dateKey(date);
                   const dayAppointments = appointmentsByDate.get(key) || [];
+                  const dayGoogleEvents = googleEventsByDate.get(key) || [];
+                  const itemCount =
+                    dayAppointments.length + dayGoogleEvents.length;
                   const isCurrentMonth =
                     date.getMonth() === viewMonth.getMonth();
                   const isToday = key === dateKey(new Date());
@@ -720,14 +842,12 @@ function AdminSchedulePage() {
                       className={`admin-schedule__day ${isCurrentMonth ? "" : "is-outside"} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
                       type="button"
                       key={key}
-                      aria-label={`${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(date)}, ${dayAppointments.length} appointments`}
+                      aria-label={`${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(date)}, ${itemCount} calendar items`}
                       aria-pressed={isSelected}
                       onClick={() => selectDate(date)}
                     >
                       <span>{date.getDate()}</span>
-                      {dayAppointments.length > 0 && (
-                        <small>{dayAppointments.length}</small>
-                      )}
+                      {itemCount > 0 && <small>{itemCount}</small>}
                     </button>
                   );
                 })}
@@ -926,14 +1046,18 @@ function AdminSchedulePage() {
                   <p className="customer-eyebrow">Daily agenda</p>
                   <h2>{selectedDateLabel}</h2>
                 </div>
-                <span>{selectedAppointments.length} bookings</span>
+                <span>
+                  {selectedAppointments.length + selectedGoogleEvents.length}{" "}
+                  calendar items
+                </span>
               </div>
 
               {loading ? (
                 <p role="status">Loading appointments...</p>
-              ) : selectedAppointments.length === 0 ? (
+              ) : selectedAppointments.length === 0 &&
+                selectedGoogleEvents.length === 0 ? (
                 <p className="customer-empty-state">
-                  No appointments scheduled for this date.
+                  No calendar items scheduled for this date.
                 </p>
               ) : (
                 <div className="admin-schedule__list">
@@ -1057,6 +1181,30 @@ function AdminSchedulePage() {
                       )}
                     </article>
                   ))}
+                  {selectedGoogleEvents.map((event) => {
+                    const start = event.start?.dateTime || event.start?.date;
+                    return (
+                      <article
+                        key={`google-${event.id}`}
+                        className="admin-schedule__google-event"
+                      >
+                        <time dateTime={start}>
+                          {new Intl.DateTimeFormat(undefined, {
+                            hour: event.start?.dateTime ? "numeric" : undefined,
+                            minute: event.start?.dateTime
+                              ? "2-digit"
+                              : undefined,
+                          }).format(new Date(start))}
+                        </time>
+                        <div>
+                          <strong>
+                            {event.summary || "Google Calendar event"}
+                          </strong>
+                          <span>Google Calendar</span>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>

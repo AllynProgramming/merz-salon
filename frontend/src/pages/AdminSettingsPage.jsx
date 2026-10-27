@@ -59,7 +59,11 @@ const integrationItems = [
 
 const secretFields = [
   { key: "googleClientId", label: "Google client ID", type: "text" },
-  { key: "googleClientSecret", label: "Google client secret", type: "password" },
+  {
+    key: "googleClientSecret",
+    label: "Google client secret",
+    type: "password",
+  },
   {
     key: "googleOauthRedirectUri",
     label: "Google OAuth redirect URI",
@@ -120,9 +124,11 @@ function AdminSettingsPage() {
           const savedSettings = Object.fromEntries(
             Object.entries(payload.settings).filter(
               ([key]) =>
-                !["secretsConfigured", "calendarConnected", "calendarEmail"].includes(
-                  key,
-                ),
+                ![
+                  "secretsConfigured",
+                  "calendarConnected",
+                  "calendarEmail",
+                ].includes(key),
             ),
           );
           setSettings({
@@ -164,9 +170,11 @@ function AdminSettingsPage() {
       const savedSettings = Object.fromEntries(
         Object.entries(payload.settings).filter(
           ([key]) =>
-            !["secretsConfigured", "calendarConnected", "calendarEmail"].includes(
-              key,
-            ),
+            ![
+              "secretsConfigured",
+              "calendarConnected",
+              "calendarEmail",
+            ].includes(key),
         ),
       );
       setSettings({
@@ -206,14 +214,28 @@ function AdminSettingsPage() {
           </Link>
         </header>
 
-        {error && <div className="customer-alert customer-alert-error" role="alert">{error}</div>}
-        {notice && <div className="customer-alert customer-alert-success" role="status">{notice}</div>}
+        {error && (
+          <div className="customer-alert customer-alert-error" role="alert">
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div className="customer-alert customer-alert-success" role="status">
+            {notice}
+          </div>
+        )}
 
-        <section className="customer-panel admin-settings-panel" aria-labelledby="admin-settings-heading">
+        <section
+          className="customer-panel admin-settings-panel"
+          aria-labelledby="admin-settings-heading"
+        >
           <div className="customer-panel-header">
             <div>
               <h2 id="admin-settings-heading">Active channels</h2>
-              <p>Switches take effect for new reminders and customer sign-in immediately.</p>
+              <p>
+                Switches take effect for new reminders and customer sign-in
+                immediately.
+              </p>
             </div>
             {saving && <span role="status">Saving…</span>}
           </div>
@@ -227,72 +249,99 @@ function AdminSettingsPage() {
                     <h3>{item.title}</h3>
                     <p>{item.description}</p>
                     {!item.connected && item.key !== "googleCalendar" && (
-                      <span className="admin-settings-status">Not connected</span>
-                    )}
-                    {item.key === "googleCalendar" && settings.calendarConnected && (
                       <span className="admin-settings-status">
-                        Connected{settings.calendarEmail ? ` as ${settings.calendarEmail}` : ""}
+                        Not connected
                       </span>
                     )}
+                    {item.key === "googleCalendar" &&
+                      settings.calendarConnected && (
+                        <span className="admin-settings-status">
+                          Connected
+                          {settings.calendarEmail
+                            ? ` as ${settings.calendarEmail}`
+                            : ""}
+                        </span>
+                      )}
                   </div>
                   {item.key === "googleCalendar" ? (
-                    <button
-                      className="customer-button customer-button-outline"
-                      type="button"
-                      disabled={saving}
-                      onClick={async () => {
-                        setError("");
-                        setNotice("");
-                        try {
-                          const response = await fetch(
-                            "/api/admin/calendar/connect",
-                            {
-                              headers: {
-                                Accept: "application/json",
-                                Authorization: `Bearer ${token}`,
+                    <div className="admin-settings-actions">
+                      <button
+                        className={`admin-settings-toggle${settings.googleCalendar ? " is-on" : ""}`}
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.googleCalendar}
+                        aria-label={`${settings.googleCalendar ? "Disable" : "Enable"} Google Calendar`}
+                        disabled={saving}
+                        onClick={() => updateSetting("googleCalendar")}
+                      >
+                        <span />
+                        {settings.googleCalendar ? "On" : "Off"}
+                      </button>
+                      <button
+                        className="customer-button customer-button-outline"
+                        type="button"
+                        disabled={saving}
+                        onClick={async () => {
+                          setError("");
+                          setNotice("");
+                          try {
+                            const response = await fetch(
+                              "/api/admin/calendar/connect",
+                              {
+                                headers: {
+                                  Accept: "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
                               },
-                            },
-                          );
-                          const payload = await response.json().catch(() => ({}));
-                          if (!response.ok) {
-                            throw new Error(
-                              payload.message || "Could not connect Google Calendar.",
                             );
+                            const payload = await response
+                              .json()
+                              .catch(() => ({}));
+                            if (!response.ok) {
+                              throw new Error(
+                                payload.message ||
+                                  "Could not connect Google Calendar.",
+                              );
+                            }
+                            window.location.href = payload.authorizationUrl;
+                          } catch (requestError) {
+                            setError(requestError.message);
                           }
-                          window.location.href = payload.authorizationUrl;
-                        } catch (requestError) {
-                          setError(requestError.message);
-                        }
-                      }}
-                    >
-                      {settings.calendarConnected ? "Reconnect" : "Connect"}
-                    </button>
+                        }}
+                      >
+                        {settings.calendarConnected ? "Reconnect" : "Connect"}
+                      </button>
+                    </div>
                   ) : (
-                  <button
-                    className={`admin-settings-toggle${settings[item.key] ? " is-on" : ""}`}
-                    type="button"
-                    role="switch"
-                    aria-checked={settings[item.key]}
-                    aria-label={`${settings[item.key] ? "Disable" : "Enable"} ${item.title}`}
-                    disabled={saving}
-                    onClick={() => updateSetting(item.key)}
-                  >
-                    <span />
-                    {settings[item.key] ? "On" : "Off"}
-                  </button>
+                    <button
+                      className={`admin-settings-toggle${settings[item.key] ? " is-on" : ""}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={settings[item.key]}
+                      aria-label={`${settings[item.key] ? "Disable" : "Enable"} ${item.title}`}
+                      disabled={saving}
+                      onClick={() => updateSetting(item.key)}
+                    >
+                      <span />
+                      {settings[item.key] ? "On" : "Off"}
+                    </button>
                   )}
                 </div>
               ))}
             </div>
           )}
         </section>
-        <section className="customer-panel admin-settings-panel" aria-labelledby="admin-credentials-heading">
+        <section
+          className="customer-panel admin-settings-panel"
+          aria-labelledby="admin-credentials-heading"
+        >
           <div className="customer-panel-header">
             <div>
               <h2 id="admin-credentials-heading">Integration credentials</h2>
               <p>
-                Credentials are encrypted before they are stored. Existing values
-                are never returned to the browser; leave a field blank to keep it.
+                Credentials are encrypted before they are stored. Existing
+                values are never returned to the browser; leave a field blank to
+                keep it.
               </p>
             </div>
           </div>
@@ -302,7 +351,11 @@ function AdminSettingsPage() {
                 <span>{field.label}</span>
                 <input
                   type={field.type}
-                  placeholder={credentials[field.key] ? "Configured — enter a new value to replace" : ""}
+                  placeholder={
+                    credentials[field.key]
+                      ? "Configured — enter a new value to replace"
+                      : ""
+                  }
                   autoComplete="new-password"
                   onChange={(event) =>
                     setCredentials((current) => ({
@@ -324,30 +377,42 @@ function AdminSettingsPage() {
               setNotice("");
               const settingsPayload = Object.fromEntries(
                 Object.entries(settings).filter(
-                  ([key]) => !["calendarConnected", "calendarEmail"].includes(key),
+                  ([key]) =>
+                    !["calendarConnected", "calendarEmail"].includes(key),
                 ),
               );
               requestSettings("/api/admin/settings", token, {
                 method: "PUT",
-                body: JSON.stringify({ ...settingsPayload, ...Object.fromEntries(
-                  secretFields
-                    .filter(({ key }) => credentials[key] && typeof credentials[key] === "string")
-                    .map(({ key }) => [key, credentials[key]]),
-                ) }),
+                body: JSON.stringify({
+                  ...settingsPayload,
+                  ...Object.fromEntries(
+                    secretFields
+                      .filter(
+                        ({ key }) =>
+                          credentials[key] &&
+                          typeof credentials[key] === "string",
+                      )
+                      .map(({ key }) => [key, credentials[key]]),
+                  ),
+                }),
               })
                 .then((payload) => {
                   const savedSettings = Object.fromEntries(
                     Object.entries(payload.settings).filter(
                       ([key]) =>
-                        !["secretsConfigured", "calendarConnected", "calendarEmail"].includes(
-                          key,
-                        ),
+                        ![
+                          "secretsConfigured",
+                          "calendarConnected",
+                          "calendarEmail",
+                        ].includes(key),
                     ),
                   );
                   setSettings({
                     ...initialSettings,
                     ...savedSettings,
-                    calendarConnected: Boolean(payload.settings.calendarConnected),
+                    calendarConnected: Boolean(
+                      payload.settings.calendarConnected,
+                    ),
                     calendarEmail: payload.settings.calendarEmail || "",
                   });
                   setCredentials(payload.settings.secretsConfigured || {});

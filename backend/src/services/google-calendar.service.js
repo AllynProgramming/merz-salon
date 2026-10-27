@@ -12,7 +12,12 @@ const getConfig = async () => {
   const clientSecret =
     secrets.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET;
 
-  if (!settings?.googleCalendar || !secrets.calendarRefreshToken || !clientId || !clientSecret) {
+  if (
+    !settings?.googleCalendar ||
+    !secrets.calendarRefreshToken ||
+    !clientId ||
+    !clientSecret
+  ) {
     return null;
   }
 
@@ -38,7 +43,9 @@ const getAccessToken = async (config) => {
   });
   const payload = await response.json();
   if (!response.ok || !payload.access_token) {
-    throw new Error(payload.error_description || "Could not refresh Google Calendar access.");
+    throw new Error(
+      payload.error_description || "Could not refresh Google Calendar access.",
+    );
   }
   return payload.access_token;
 };
@@ -56,7 +63,9 @@ const calendarRequest = async (config, path, options = {}) => {
   if (response.status === 204) return null;
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error?.message || "Google Calendar request failed.");
+    throw new Error(
+      payload.error?.message || "Google Calendar request failed.",
+    );
   }
   return payload;
 };
@@ -114,4 +123,25 @@ export const syncAppointmentToGoogleCalendar = async (appointment) => {
     );
   }
   return synced;
+};
+
+export const listGoogleCalendarEvents = async ({ timeMin, timeMax }) => {
+  const config = await getConfig();
+  if (!config) return { connected: false, events: [] };
+
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    timeMin,
+    timeMax,
+  });
+  const payload = await calendarRequest(
+    config,
+    `/calendars/${encodeURIComponent(config.calendarId)}/events?${params}`,
+  );
+
+  return {
+    connected: true,
+    events: payload.items || [],
+  };
 };
