@@ -148,6 +148,20 @@ function AdminDashboardPage() {
               Here’s the latest appointment overview.
             </p>
           </div>
+          <div className="admin-dashboard__heading-actions">
+            <Link
+              className="customer-button customer-button-primary"
+              to="/staff/book-appointment"
+            >
+              Book appointment
+            </Link>
+            <Link
+              className="customer-button customer-button-outline"
+              to="/admin/schedule"
+            >
+              Open schedule
+            </Link>
+          </div>
         </header>
 
         {error && (

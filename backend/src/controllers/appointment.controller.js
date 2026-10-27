@@ -614,8 +614,11 @@ export const listAppointments = async (req, res, next) => {
       return {
         _id: appointment._id,
         ...(isStaffView && {
-          customerId: String(appointment.customer?._id || appointment.customer),
+          customerId: appointment.customer
+            ? String(appointment.customer?._id || appointment.customer)
+            : null,
           customerName:
+            appointment.walkInCustomer?.name ||
             appointment.customer?.name ||
             [appointment.customer?.firstname, appointment.customer?.lastname]
               .filter(Boolean)
@@ -1095,7 +1098,18 @@ export const createStaffAppointment = async (req, res, next) => {
     const appointment = await withBookingDateLock(date, async () => {
       const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
       const newAppointment = new Appointment({
-        customer: customer._id,
+        ...(customer ? { customer: customer._id } : {}),
+        ...(walkInCustomer
+          ? {
+              walkInCustomer: {
+                name: walkInCustomer.name,
+                phone: walkInCustomer.phone,
+                ...(walkInCustomer.email
+                  ? { email: walkInCustomer.email }
+                  : {}),
+              },
+            }
+          : {}),
         service: service._id,
         date: appointmentDate,
         bookingReference,
@@ -1123,7 +1137,10 @@ export const createStaffAppointment = async (req, res, next) => {
       await newAppointment.save();
       return newAppointment;
     });
-    await appointment.populate("staff", "name firstname lastname");
+    await appointment.populate([
+      { path: "customer", select: "name firstname lastname" },
+      { path: "staff", select: "name firstname lastname" },
+    ]);
 
     await createAppointmentNotifications({
       appointment,

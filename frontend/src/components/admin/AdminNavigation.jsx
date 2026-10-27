@@ -4,6 +4,7 @@ import { getDashboardPath } from "../../utils/accountRole.js";
 
 const adminItems = [
   { to: "/admin", label: "Overview", section: "Today" },
+  { to: "/staff/book-appointment", label: "Book appointment", section: "Today" },
   { to: "/admin/schedule", label: "Schedule", section: "Manage" },
   { to: "/admin/services", label: "Services", section: "Manage" },
   { to: "/admin/staff", label: "Staff", section: "Manage", adminOnly: true },
