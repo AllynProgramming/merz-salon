@@ -7,6 +7,7 @@ import Button from "../components/auth/Button.jsx";
 import FormField from "../components/auth/FormField.jsx";
 import PasswordInput from "../components/auth/PasswordInput.jsx";
 import { getDashboardPath } from "../utils/accountRole.js";
+import { RecaptchaWidget } from "../utils/recaptcha.jsx";
 
 function validate(values) {
   const errors = {};
@@ -26,6 +27,7 @@ function LoginPage() {
   const [serverError, setServerError] = useState("");
   const [success, setSuccess] = useState(location.state?.notice || "");
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
   const googleError = new URLSearchParams(location.search).get("google_error");
   const googleMessages = {
     disabled: "Google login is currently disabled.",
@@ -61,7 +63,10 @@ function LoginPage() {
     setLoading(true);
     setServerError("");
     try {
-      const user = await login({ email: values.email.trim(), password: values.password });
+      const user = await login(
+        { email: values.email.trim(), password: values.password },
+        recaptchaToken,
+      );
       const requestedPage = location.state?.from;
       const fallback = getDashboardPath(user?.role) || "/";
       const destination = requestedPage
@@ -85,17 +90,22 @@ function LoginPage() {
       <Alert>{serverError}</Alert>
       <Alert>{googleMessages[googleError] || ""}</Alert>
       <Alert variant="success">{success}</Alert>
-      <button
-        className="auth-button auth-button-secondary"
-        type="button"
-        onClick={() => {
-          window.location.href = "/api/auth/google";
-        }}
-      >
-        Continue with Google
-      </button>
+      <div className="auth-login-google">
+        <button
+          className="auth-button-secondary"
+          type="button"
+          onClick={() => {
+            window.location.href = "/api/auth/google";
+          }}
+        >
+          Continue with Google
+        </button>
+        <div className="auth-divider" aria-hidden="true">
+          <span>or use your email</span>
+        </div>
+      </div>
 
-      <form className="auth-form" onSubmit={submit} noValidate>
+      <form className="auth-form auth-login-form" onSubmit={submit} noValidate>
         <FormField
           id="login-email"
           label="Email address"
@@ -127,6 +137,8 @@ function LoginPage() {
           autoComplete="current-password"
           error={touched.password ? errors.password : ""}
         />
+
+        <RecaptchaWidget onChange={setRecaptchaToken} />
 
         <div className="auth-form-options">
           <label className="auth-check-label">

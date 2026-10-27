@@ -17,22 +17,11 @@ import {
   createAppointmentNotifications,
   syncReminderState,
 } from "../services/notification.service.js";
+import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
+import { syncAppointmentToGoogleCalendar } from "../services/google-calendar.service.js";
 
 let reminderJob;
 let expirationJob;
-
-const transport =
-  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
-    ? nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: Boolean(process.env.SMTP_SECURE === "true"),
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      })
-    : null;
 
 const formatAppointmentDate = (date, startTime) => {
   const parsed = new Date(date);
@@ -41,11 +30,24 @@ const formatAppointmentDate = (date, startTime) => {
 };
 
 const sendReminderEmail = async (appointment, notification) => {
+  const secrets = await getIntegrationSecrets(IntegrationSettings);
+  const host = secrets.smtpHost || process.env.SMTP_HOST;
+  const user = secrets.smtpUser || process.env.SMTP_USER;
+  const pass = secrets.smtpPass || process.env.SMTP_PASS;
+  const transport =
+    host && user && pass
+      ? nodemailer.createTransport({
+          host,
+          port: Number(secrets.smtpPort || process.env.SMTP_PORT || 587),
+          secure: Boolean(process.env.SMTP_SECURE === "true"),
+          auth: { user, pass },
+        })
+      : null;
   if (!transport || !appointment.customer?.email) return false;
 
   try {
     await transport.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: secrets.smtpFrom || process.env.SMTP_FROM || user,
       to: appointment.customer.email,
       subject: notification.title,
       text: notification.message,
@@ -125,6 +127,11 @@ export const completePastAppointments = async () => {
       note: "Appointment completed automatically after its scheduled end time.",
     });
     await appointment.save();
+    try {
+      await syncAppointmentToGoogleCalendar(appointment);
+    } catch (error) {
+      console.error("Failed to sync completed appointment to Google Calendar:", error.message);
+    }
   }
 };
 

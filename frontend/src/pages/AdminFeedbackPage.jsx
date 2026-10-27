@@ -5,6 +5,7 @@ import StarRating from "../components/customer/StarRating.jsx";
 import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 
 function formatAppointmentDate(value) {
   if (!value) return "";
@@ -92,6 +93,7 @@ function AdminFeedbackPage() {
 
   return (
     <div className="customer-page salon-landing admin-feedback-page">
+      <AdminNavigation />
       <Helmet>
         <title>Customer Feedback | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />

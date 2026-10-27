@@ -13,13 +13,14 @@ import {
 } from "../controllers/appointment.controller.js";
 import {
   protect,
+  requirePasswordChangeComplete,
   requireAdmin,
   requireStaffOrAdmin,
 } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.use(protect, requireStaffOrAdmin);
+router.use(protect, requireStaffOrAdmin, requirePasswordChangeComplete);
 router.get("/availability/calendar", getAvailabilityCalendar);
 router.get("/availability", getAvailability);
 router.get("/customers", searchBookingCustomers);

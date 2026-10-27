@@ -24,6 +24,7 @@ const sanitizeUser = (user) => ({
   phone: user.phone || user.phoneNumber,
   phoneNumber: user.phoneNumber,
   role: user.role,
+  mustChangePassword: Boolean(user.mustChangePassword),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -129,9 +130,13 @@ export const changePassword = async (req, res) => {
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
+    user.mustChangePassword = false;
     await user.save();
 
-    return res.status(200).json({ message: "Password updated successfully" });
+    return res.status(200).json({
+      message: "Password updated successfully",
+      user: sanitizeUser(user),
+    });
   } catch (error) {
     console.error("Change password error:", error);
     return res.status(500).json({ message: "Internal server error" });

@@ -3,6 +3,7 @@ import FormField from "./FormField.jsx";
 
 function PasswordInput({
   id,
+  name,
   label,
   value,
   onChange,
@@ -20,7 +21,7 @@ function PasswordInput({
           <input
             {...fieldProps}
             className="auth-input auth-password-input"
-            name={id.split("-").at(-1)}
+            name={name || id.split("-").at(-1)}
             type={visible ? "text" : "password"}
             value={value}
             onChange={onChange}

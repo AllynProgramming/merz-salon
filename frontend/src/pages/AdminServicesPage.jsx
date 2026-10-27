@@ -12,6 +12,7 @@ import {
 } from "../services/bookingApi.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import "../styles/admin-services.css";
 
 const emptyForm = {
@@ -166,6 +167,7 @@ function AdminServicesPage() {
 
   return (
     <div className="customer-page salon-landing admin-services-page">
+      <AdminNavigation />
       <Helmet>
         <title>Manage Services | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />

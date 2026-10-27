@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { z } from "zod";
 import Appointment from "../models/appointment.model.js";
 import User from "../models/user.model.js";
@@ -9,16 +10,23 @@ const createStaffSchema = z
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().email().max(254),
     phone: z.string().trim().min(7).max(30),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters.")
-      .max(128)
-      .regex(
-        /^(?=.*[A-Za-z])(?=.*\d).+$/,
-        "Password must include at least one letter and one number.",
-      ),
   })
   .strict();
+
+const updateStaffSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    phone: z.string().trim().min(7).max(30).optional(),
+    resetPassword: z.boolean().optional().default(false),
+  })
+  .strict()
+  .refine(
+    (data) =>
+      data.name !== undefined ||
+      data.phone !== undefined ||
+      data.resetPassword,
+    "Provide a name, phone number, or password reset.",
+  );
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 const workingHoursSchema = z
@@ -57,9 +65,10 @@ export const createStaff = async (req, res, next) => {
     });
   }
 
-  const { name, phone, password } = validation.data;
+  const { name, phone } = validation.data;
   const email = validation.data.email.toLowerCase();
   const [firstname, ...lastname] = name.split(/\s+/);
+  const temporaryPassword = `Merz-${crypto.randomBytes(6).toString("base64url")}`;
 
   try {
     const existingUser = await User.findOne({
@@ -71,7 +80,7 @@ export const createStaff = async (req, res, next) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
     const staff = await User.create({
       name,
       firstname,
@@ -80,11 +89,13 @@ export const createStaff = async (req, res, next) => {
       phone,
       phoneNumber: phone,
       password: hashedPassword,
+      mustChangePassword: true,
       role: "staff",
     });
 
     return res.status(201).json({
       message: "Staff account created.",
+      temporaryPassword,
       staff: {
         _id: staff._id,
         name: staff.name,
@@ -106,7 +117,7 @@ export const createStaff = async (req, res, next) => {
 export const listStaff = async (req, res, next) => {
   try {
     const staff = await User.find({ role: "staff" })
-      .select("name firstname lastname email workingHours")
+      .select("name firstname lastname email phone phoneNumber workingHours")
       .sort({ name: 1 })
       .lean();
 
@@ -118,10 +129,94 @@ export const listStaff = async (req, res, next) => {
           [member.firstname, member.lastname].filter(Boolean).join(" ") ||
           member.email,
         email: member.email,
+        phone: member.phone || member.phoneNumber || "",
         workingHours: member.workingHours || [],
       })),
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateStaff = async (req, res, next) => {
+  if (!staffIdPattern.test(req.params.id)) {
+    return res.status(400).json({ message: "Invalid staff member." });
+  }
+
+  const validation = updateStaffSchema.safeParse(req.body);
+  if (!validation.success) {
+    return res.status(400).json({
+      message: validation.error.issues[0]?.message || "Invalid staff update.",
+    });
+  }
+
+  const { name, phone, resetPassword } = validation.data;
+  const temporaryPassword = resetPassword
+    ? `Merz-${crypto.randomBytes(6).toString("base64url")}`
+    : null;
+
+  try {
+    const duplicatePhone = phone
+      ? await User.findOne({
+          _id: { $ne: req.params.id },
+          $or: [{ phone }, { phoneNumber: phone }],
+        })
+      : null;
+    if (duplicatePhone) {
+      return res.status(409).json({
+        message: "An account with this phone number already exists.",
+      });
+    }
+
+    const updates = {};
+    if (name !== undefined) {
+      const [firstname, ...lastname] = name.split(/\s+/);
+      updates.name = name;
+      updates.firstname = firstname;
+      updates.lastname = lastname.join(" ");
+    }
+    if (phone !== undefined) {
+      updates.phone = phone;
+      updates.phoneNumber = phone;
+    }
+    if (temporaryPassword) {
+      updates.password = await bcrypt.hash(temporaryPassword, 12);
+      updates.mustChangePassword = true;
+    }
+
+    const staff = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "staff" },
+      { $set: updates },
+      { new: true, runValidators: true },
+    )
+      .select("name firstname lastname email phone phoneNumber workingHours mustChangePassword")
+      .lean();
+
+    if (!staff) {
+      return res.status(404).json({ message: "Staff member not found." });
+    }
+
+    return res.status(200).json({
+      message: "Staff account updated.",
+      temporaryPassword,
+      staff: {
+        _id: staff._id,
+        name:
+          staff.name ||
+          [staff.firstname, staff.lastname].filter(Boolean).join(" ") ||
+          staff.email,
+        email: staff.email,
+        phone: staff.phone || staff.phoneNumber || "",
+        mustChangePassword: Boolean(staff.mustChangePassword),
+        workingHours: staff.workingHours || [],
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "An account with this email or phone number already exists.",
+      });
+    }
     return next(error);
   }
 };

@@ -17,6 +17,8 @@ import feedbackRoutes from "./routes/feedback.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import adminSettingsRoutes from "./routes/admin-settings.routes.js";
 import adminReportsRoutes from "./routes/admin-reports.routes.js";
+import publicSettingsRoutes from "./routes/public-settings.routes.js";
+import adminCalendarRoutes from "./routes/admin-calendar.routes.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
 
 config();
@@ -31,7 +33,38 @@ const authLimiter = rateLimit({
   message: { message: "Too many authentication attempts. Try again later." },
 });
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        "script-src": [
+          "'self'",
+          "https://www.google.com/recaptcha/",
+          "https://www.gstatic.com/recaptcha/",
+        ],
+        "connect-src": [
+          "'self'",
+          "https://www.google.com/recaptcha/",
+          "https://www.gstatic.com/recaptcha/",
+        ],
+        "frame-src": [
+          "'self'",
+          "https://www.google.com/recaptcha/",
+          "https://recaptcha.google.com/recaptcha/",
+          "https://www.google.com/maps/",
+          "https://calendar.google.com/",
+        ],
+        "img-src": [
+          "'self'",
+          "data:",
+          "https://www.google.com/recaptcha/",
+          "https://www.gstatic.com/recaptcha/",
+        ],
+        "worker-src": ["'self'", "blob:"],
+      },
+    },
+  }),
+);
 app.use(express.json({ limit: "20kb" }));
 app.use(cors({ origin: clientUrl, credentials: true }));
 
@@ -44,9 +77,11 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/staff/appointments", staffAppointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/admin/calendar", adminCalendarRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin/reports", adminReportsRoutes);
+app.use("/api/settings", publicSettingsRoutes);
 app.use("/api/customers", customerRoutes);
 
 app.use((req, res) => {

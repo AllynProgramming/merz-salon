@@ -62,6 +62,10 @@ const appointmentSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    calendarEventId: {
+      type: String,
+      default: "",
+    },
     statusHistory: [
       {
         status: {

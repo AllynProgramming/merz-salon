@@ -21,6 +21,7 @@ import StaffServicesPage from "./pages/StaffServicesPage.jsx";
 import StaffBookingPage from "./pages/StaffBookingPage.jsx";
 import AdminSettingsPage from "./pages/AdminSettingsPage.jsx";
 import GoogleCallbackPage from "./pages/GoogleCallbackPage.jsx";
+import StaffChangePasswordPage from "./pages/StaffChangePasswordPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
@@ -47,6 +48,7 @@ function Routes() {
     {
       element: <ProtectedRoute allowedRoles={["staff", "admin"]} />,
       children: [
+        { path: "/staff/change-password", element: <StaffChangePasswordPage /> },
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
         { path: "/staff/services", element: <StaffServicesPage /> },
         { path: "/staff/book-appointment", element: <StaffBookingPage /> },
