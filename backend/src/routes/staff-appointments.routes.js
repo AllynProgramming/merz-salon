@@ -7,6 +7,7 @@ import {
   createStaffAppointment,
   getAvailability,
   getAvailabilityCalendar,
+  getStaffAppointment,
   listAppointments,
   rescheduleStaffAppointment,
   searchBookingCustomers,
@@ -26,6 +27,7 @@ router.get("/availability", getAvailability);
 router.get("/customers", searchBookingCustomers);
 router.get("/", listAppointments);
 router.post("/", createStaffAppointment);
+router.get("/:id", getStaffAppointment);
 router.patch("/:id/cancel", cancelStaffAppointment);
 router.patch("/:id/reschedule", rescheduleStaffAppointment);
 router.patch("/:id/assign", requireAdmin, assignAppointmentStaff);

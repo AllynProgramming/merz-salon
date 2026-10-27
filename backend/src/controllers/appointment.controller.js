@@ -1,3 +1,5 @@
+import { randomBytes, randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import Appointment from "../models/appointment.model.js";
@@ -110,25 +112,34 @@ const createAppointmentSchema = z
   })
   .strict();
 
+const walkInCustomerSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    phone: z.string().trim().min(7).max(30),
+    email: z.string().trim().email().max(254).optional().or(z.literal("")),
+  })
+  .strict();
+
 const createStaffAppointmentSchema = z
   .object({
     customerId: z
       .string()
       .regex(objectIdPattern, "Choose a valid customer.")
       .optional(),
-    walkInCustomer: z
-      .object({
-        name: z.string().trim().min(2).max(120),
-        phone: z.string().trim().min(7).max(30),
-        email: z.string().trim().max(254).email().optional().or(z.literal("")),
-      })
-      .strict()
-      .optional(),
+    walkInCustomer: walkInCustomerSchema.optional(),
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
     startTime: z.string().regex(timePattern, "Choose a valid time."),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ customerId, walkInCustomer }) =>
+      Boolean(customerId) !== Boolean(walkInCustomer),
+    {
+      message: "Choose a customer or enter walk-in customer details.",
+      path: ["customerId"],
+    },
+  );
 
 const staffCustomerSearchSchema = z
   .object({
@@ -1001,24 +1012,82 @@ export const createStaffAppointment = async (req, res, next) => {
   try {
     const { customerId, walkInCustomer, serviceId, date, startTime } =
       validation.data;
-    if ((!customerId && !walkInCustomer) || (customerId && walkInCustomer)) {
-      return res.status(400).json({
-        message: "Choose a registered customer or provide walk-in details.",
-      });
-    }
-
-    const [customer, service] = await Promise.all([
+    const [customerRecord, service] = await Promise.all([
       customerId
-        ? User.findOne({ _id: customerId, role: "customer" }).select("_id")
-        : null,
+        ? User.findOne({ _id: customerId, role: "customer" }).select(
+            "_id name firstname lastname email phone phoneNumber",
+          )
+        : Promise.resolve(null),
       Service.findOne({ _id: serviceId, isActive: true }),
     ]);
 
-    if (customerId && !customer) {
+    if (customerId && !customerRecord) {
       return res.status(404).json({ message: "Customer account not found." });
     }
     if (!service) {
       return res.status(404).json({ message: "Choose an available service." });
+    }
+
+    let customer = customerRecord;
+    if (walkInCustomer) {
+      const walkInName = walkInCustomer.name.trim();
+      const walkInPhone = walkInCustomer.phone.trim();
+      const walkInEmail = walkInCustomer.email.trim().toLowerCase();
+      const identityConditions = [
+        { phone: walkInPhone },
+        { phoneNumber: walkInPhone },
+        ...(walkInEmail ? [{ email: walkInEmail }] : []),
+      ];
+      const matchingCustomers = await User.find({
+        role: "customer",
+        $or: identityConditions,
+      })
+        .select("_id name firstname lastname email phone phoneNumber")
+        .limit(2)
+        .lean();
+
+      if (matchingCustomers.length > 1) {
+        return res.status(409).json({
+          message:
+            "These walk-in details match multiple customer accounts. Search for and select the existing customer instead.",
+        });
+      }
+      customer = matchingCustomers[0] || null;
+
+      if (!customer) {
+        const conflictingUser = await User.exists({
+          role: { $ne: "customer" },
+          $or: identityConditions,
+        });
+        if (conflictingUser) {
+          return res.status(409).json({
+            message:
+              "These contact details belong to a staff or admin account. Check the details and try again.",
+          });
+        }
+
+        const generatedEmail =
+          walkInEmail || `walkin-${randomUUID()}@walkin.local`;
+        try {
+          customer = await User.create({
+            name: walkInName,
+            firstname: walkInName.split(/\s+/)[0] || walkInName,
+            lastname: walkInName.split(/\s+/).slice(1).join(" "),
+            email: generatedEmail,
+            phone: walkInPhone,
+            phoneNumber: walkInPhone,
+            password: await bcrypt.hash(randomBytes(32).toString("hex"), 12),
+            role: "customer",
+            address: "",
+          });
+        } catch (error) {
+          if (error.code !== 11000) throw error;
+          return res.status(409).json({
+            message:
+              "A customer with these contact details was just created. Search for and select that customer, then try again.",
+          });
+        }
+      }
     }
 
     const appointmentDate = normalizeDateValue(date);
@@ -1097,14 +1166,67 @@ export const createStaffAppointment = async (req, res, next) => {
         serviceName: service.name,
         servicePrice: service.price,
         durationMinutes: service.durationMinutes,
+        staffName: getStaffDisplayName(appointment.staff),
         customerName:
-          appointment.walkInCustomer?.name ||
+          (walkInCustomer?.name || "").trim() ||
+          customer.name ||
+          [customer.firstname, customer.lastname].filter(Boolean).join(" ") ||
+          "Customer",
+        isWalkIn: Boolean(walkInCustomer),
+        date: appointment.date,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        status: appointment.status,
+        bookingReference: appointment.bookingReference,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getStaffAppointment = async (req, res, next) => {
+  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
+  if (!validation.success) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  try {
+    const appointment = await Appointment.findById(validation.data.id)
+      .populate("service", "name price durationMinutes")
+      .populate("staff", "name firstname lastname")
+      .populate("customer", "name firstname lastname");
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+
+    return res.status(200).json({
+      appointment: {
+        _id: appointment._id,
+        customerName:
           appointment.customer?.name ||
-          [appointment.customer?.firstname, appointment.customer?.lastname]
+          [
+            appointment.customer?.firstname,
+            appointment.customer?.lastname,
+          ]
             .filter(Boolean)
             .join(" ") ||
-          "Registered customer",
-        isWalkIn: Boolean(appointment.walkInCustomer?.name),
+          "Customer",
+        service: appointment.service
+          ? {
+              _id: appointment.service._id,
+              name: appointment.service.name,
+              price: appointment.service.price,
+              durationMinutes: appointment.service.durationMinutes,
+            }
+          : null,
+        serviceName: appointment.service?.name || "Salon service",
+        servicePrice: appointment.priceSnapshot ?? appointment.service?.price,
+        durationMinutes:
+          appointment.durationMinutes ??
+          appointment.service?.durationMinutes ??
+          0,
         staffName: getStaffDisplayName(appointment.staff),
         date: appointment.date,
         startTime: appointment.startTime,
