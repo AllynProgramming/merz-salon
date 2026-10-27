@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import "../styles/admin-reports.css";
 
 const formatCurrency = (value) =>
@@ -66,6 +67,7 @@ function AdminReportsPage() {
 
   return (
     <div className="customer-page salon-landing admin-reports-page">
+      <AdminNavigation />
       <Helmet>
         <title>Reports | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />

@@ -372,7 +372,12 @@ export async function getAvailabilityCalendar({ serviceId, from, to, token }) {
   return { from, to, days };
 }
 
-export async function createAppointment({ serviceId, date, startTime, token }) {
+export async function createAppointment({
+  serviceId,
+  date,
+  startTime,
+  token,
+}) {
   if (!USE_MOCK_APPOINTMENT_API) {
     return request("/api/appointments", {
       method: "POST",

@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import { cancelStaffAppointment } from "../services/bookingApi.js";
 import { formatPrice } from "../components/booking/bookingUtils.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
@@ -163,6 +164,7 @@ function AdminSchedulePage() {
   const [workingHours, setWorkingHours] = useState(defaultWorkingHours);
   const [savingHours, setSavingHours] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
+  const [calendarEmbedUrl, setCalendarEmbedUrl] = useState("");
   const calendarDays = getCalendarDays(viewMonth);
   const weekDays = getWeekDays(dateFromKey(selectedDate));
   const rangeStart =
@@ -185,6 +187,21 @@ function AdminSchedulePage() {
   const selectedDateLabel = new Intl.DateTimeFormat(undefined, {
     dateStyle: "full",
   }).format(dateFromKey(selectedDate));
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/settings/integrations")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (active) setCalendarEmbedUrl(payload?.calendarEmbedUrl || "");
+      })
+      .catch(() => {
+        if (active) setCalendarEmbedUrl("");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -438,6 +455,7 @@ function AdminSchedulePage() {
 
   return (
     <div className="customer-page salon-landing admin-schedule-page">
+      <AdminNavigation />
       <Helmet>
         <title>Manage Schedule | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
@@ -585,6 +603,30 @@ function AdminSchedulePage() {
                 )}
               </form>
             )}
+          </section>
+        )}
+
+        {calendarEmbedUrl && (
+          <section
+            className="customer-panel admin-schedule__google-calendar"
+            aria-labelledby="google-calendar-heading"
+          >
+            <div className="customer-panel-header">
+              <div>
+                <p className="customer-eyebrow">Google Calendar</p>
+                <h2 id="google-calendar-heading">Salon calendar</h2>
+                <p>
+                  The connected Google Calendar alongside the salon schedule.
+                </p>
+              </div>
+            </div>
+            <div className="admin-schedule__google-calendar-frame">
+              <iframe
+                title="Google Calendar for the salon"
+                src={calendarEmbedUrl}
+                loading="lazy"
+              />
+            </div>
           </section>
         )}
 

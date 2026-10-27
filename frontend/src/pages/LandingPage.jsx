@@ -9,6 +9,7 @@ import Feedback from "../components/landing/Feedback.jsx";
 import FAQ from "../components/landing/FAQ.jsx";
 import FinalCTA from "../components/landing/FinalCTA.jsx";
 import Footer from "../components/landing/Footer.jsx";
+import Location from "../components/landing/Location.jsx";
 import { faqData } from "../components/landing/landingContent.js";
 import "../components/landing/landing.css";
 
@@ -21,8 +22,10 @@ const salonSchema = {
     "Online salon booking and scheduling with real-time availability, reminders, and easy rescheduling.",
   address: {
     "@type": "PostalAddress",
-    streetAddress: "Grema Subdivision",
+    streetAddress: "Corner Grema Subdivision",
     addressLocality: "Malaybalay City",
+    postalCode: "8700",
+    addressRegion: "Bukidnon",
     addressCountry: "PH",
   },
   potentialAction: {
@@ -96,6 +99,7 @@ function LandingPage() {
         <DashboardPreview />
         <Feedback />
         <FAQ items={faqData} />
+        <Location />
         <FinalCTA />
       </main>
       <Footer />

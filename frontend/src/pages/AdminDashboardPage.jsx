@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import useAuth from "../context/useAuth.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
-import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 
@@ -58,29 +58,13 @@ async function fetchTodayAppointments(token, date) {
 }
 
 function AdminDashboardPage() {
-  const { user, token, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, token } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [statusCounts, setStatusCounts] = useState({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
-
-  const handleLogout = async () => {
-    if (loggingOut) return;
-
-    setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      navigate("/login", {
-        replace: true,
-        state: { notice: "You've been logged out." },
-      });
-    }
-  };
 
   useEffect(() => {
     let active = true;
@@ -145,6 +129,7 @@ function AdminDashboardPage() {
 
   return (
     <div className="customer-page salon-landing admin-dashboard-page">
+      <AdminNavigation />
       <Helmet>
         <title>
           {`${user?.role === "admin" ? "Admin Dashboard" : "Staff Dashboard"} | MERZ Beauty Salon`}
@@ -162,75 +147,6 @@ function AdminDashboardPage() {
               Welcome back, {user?.name || user?.firstname || "Team member"}.
               Here’s the latest appointment overview.
             </p>
-          </div>
-          <div className="admin-dashboard__heading-actions">
-            <StaffNotificationBell />
-            <Link
-              className="customer-button customer-button-outline admin-dashboard__manage"
-              to="/staff/services"
-            >
-              View Services
-            </Link>
-            <Link
-              className="customer-button customer-button-outline admin-dashboard__manage"
-              to="/staff/book-appointment"
-            >
-              Book for Customer
-            </Link>
-            <Link
-              className="customer-button customer-button-outline admin-dashboard__manage"
-              to="/admin/schedule"
-            >
-              Manage Schedule
-            </Link>
-            {user?.role === "admin" && (
-              <Link
-                className="customer-button customer-button-outline admin-dashboard__manage"
-                to="/admin/staff"
-              >
-                Staff Accounts
-              </Link>
-            )}
-            {user?.role === "admin" && (
-              <Link
-                className="customer-button customer-button-outline admin-dashboard__manage"
-                to="/admin/feedback"
-              >
-                Customer Feedback
-              </Link>
-            )}
-            {user?.role === "admin" && (
-              <Link
-                className="customer-button customer-button-outline admin-dashboard__manage"
-                to="/admin/reports"
-              >
-                Reports
-              </Link>
-            )}
-            {user?.role === "admin" && (
-              <Link
-                className="customer-button customer-button-outline admin-dashboard__manage"
-                to="/admin/services"
-              >
-                Manage Services
-              </Link>
-            )}
-            {user?.role === "admin" && (
-              <Link
-                className="customer-button customer-button-outline admin-dashboard__manage"
-                to="/admin/settings"
-              >
-                Integrations &amp; Settings
-              </Link>
-            )}
-            <button
-              className="customer-button customer-button-outline admin-dashboard__logout"
-              type="button"
-              onClick={handleLogout}
-              disabled={loggingOut}
-            >
-              {loggingOut ? "Logging out..." : "Log out"}
-            </button>
           </div>
         </header>
 

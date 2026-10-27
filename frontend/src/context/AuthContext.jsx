@@ -99,9 +99,11 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const saveSession = (response) => {
-    localStorage.setItem(TOKEN_KEY, response.token);
-    setToken(response.token);
-    setUser(response.user);
+    if (response.token) {
+      localStorage.setItem(TOKEN_KEY, response.token);
+      setToken(response.token);
+    }
+    if (response.user) setUser(response.user);
     setAuthNotice("");
   };
 
@@ -114,10 +116,10 @@ export function AuthProvider({ children }) {
     return response.user;
   };
 
-  const login = async (credentials) => {
+  const login = async (credentials, recaptchaToken) => {
     const response = await authRequest("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ ...credentials, recaptchaToken }),
     });
     saveSession(response);
     return response.user;

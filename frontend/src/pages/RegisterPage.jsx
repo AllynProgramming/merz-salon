@@ -115,7 +115,6 @@ function RegisterPage() {
       </p>
       <Alert>{serverError}</Alert>
       <Alert variant="success">{success}</Alert>
-
       <form
         className="auth-form auth-register-form"
         onSubmit={submit}

@@ -107,9 +107,49 @@
   line-height: 1.65;
 }
 
+.recaptcha-widget {
+  min-height: 78px;
+  margin: 4px 0 2px;
+}
+
+.recaptcha-error {
+  margin: 6px 0 0;
+  color: #a63d32;
+  font-size: 12px;
+}
+
 .auth-form {
   display: grid;
   gap: 18px;
+}
+
+.auth-login-google {
+  margin-bottom: 20px;
+}
+
+.auth-login-google .auth-button-secondary {
+  margin-top: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  color: #78897e;
+  font-size: 11px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  height: 1px;
+  flex: 1;
+  background: rgba(32, 86, 56, 0.14);
+  content: "";
+}
+
+.auth-login-form {
+  gap: 16px;
 }
 
 .auth-register-form {

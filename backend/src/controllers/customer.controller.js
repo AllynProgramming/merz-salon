@@ -99,6 +99,7 @@ const sanitizeUser = (user) => ({
   dateOfBirth: user.dateOfBirth || null,
   avatarUrl: user.avatarUrl || "",
   role: user.role,
+  mustChangePassword: Boolean(user.mustChangePassword),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });

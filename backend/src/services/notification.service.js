@@ -1,5 +1,8 @@
 import Notification from "../models/notification.model.js";
 import Appointment from "../models/appointment.model.js";
+import IntegrationSettings from "../models/integrationSettings.model.js";
+import { sendAppointmentEmail } from "./email.service.js";
+import { syncAppointmentToGoogleCalendar } from "./google-calendar.service.js";
 
 export async function createNotification({
   userId,
@@ -80,13 +83,35 @@ export async function createAppointmentNotifications({
 }) {
   if (!appointment || !appointment.customer) return null;
 
-  return createNotification({
-    userId: appointment.customer,
+  const notification = await createNotification({
+    userId: appointment.customer?._id || appointment.customer,
     appointmentId: appointment._id,
     type,
     title,
     message,
   });
+
+  if (!notification || type === "reminder") return notification;
+
+  const settings = await IntegrationSettings.findOne({
+    key: "default",
+  }).lean();
+  if (settings?.emailNotifications !== false) {
+    notification.emailSent = await sendAppointmentEmail({
+      appointment,
+      title,
+      message,
+    });
+    await notification.save();
+  }
+  if (["booking_pending", "booking_confirmed", "cancelled", "rescheduled", "booking_expired"].includes(type)) {
+    try {
+      await syncAppointmentToGoogleCalendar(appointment);
+    } catch (error) {
+      console.error("Failed to sync appointment to Google Calendar:", error.message);
+    }
+  }
+  return notification;
 }
 
 export async function createStaffAssignmentNotification({

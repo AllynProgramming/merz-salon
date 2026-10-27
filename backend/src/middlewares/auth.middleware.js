@@ -41,6 +41,17 @@ export const requireStaffOrAdmin = (req, res, next) => {
   return next();
 };
 
+export const requirePasswordChangeComplete = (req, res, next) => {
+  if (req.user?.role === "staff" && req.user.mustChangePassword) {
+    return res.status(403).json({
+      message: "Change your temporary password before using the staff dashboard.",
+      code: "PASSWORD_CHANGE_REQUIRED",
+    });
+  }
+
+  return next();
+};
+
 export const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== "admin") {
     return res.status(403).json({ message: "Admin access is required" });

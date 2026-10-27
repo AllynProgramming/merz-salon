@@ -24,6 +24,14 @@ function ProtectedRoute({ allowedRoles = ["customer"] }) {
     );
   }
 
+  if (
+    user.role === "staff" &&
+    user.mustChangePassword &&
+    location.pathname !== "/staff/change-password"
+  ) {
+    return <Navigate to="/staff/change-password" replace />;
+  }
+
   if (!allowedRoles.includes(user.role)) {
     const fallbackPath = getDashboardPath(user.role) || "/";
     return <Navigate to={fallbackPath} replace state={{ from: location }} />;

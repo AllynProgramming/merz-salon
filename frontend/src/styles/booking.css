@@ -57,6 +57,15 @@
   line-height: 1.7;
 }
 
+.booking-page .recaptcha-widget {
+  margin: 22px 0 0;
+}
+
+.booking-page .recaptcha-error {
+  color: #853a30;
+  font-size: 12px;
+}
+
 .booking-page .booking-button {
   display: inline-flex;
   min-height: 46px;

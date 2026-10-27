@@ -6,7 +6,10 @@ function Footer() {
       <div className="salon-container salon-footer-inner">
         <div className="salon-footer-address">
           <p className="salon-footer-brand">MERZ Beauty Salon</p>
-          <address>Grema Subdivision, Malaybalay City</address>
+          <address>
+            Corner Grema Subdivision, Malaybalay City, 8700 Bukidnon,
+            Philippines
+          </address>
           <a href="https://merzbeauty.com">merzbeauty.com</a>
         </div>
         <nav className="salon-footer-links" aria-label="Footer navigation">

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import User from "../models/user.model.js";
 import IntegrationSettings from "../models/integrationSettings.model.js";
+import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
 
 const signupSchema = z
   .object({
@@ -86,6 +87,7 @@ const sanitizeUser = (user) => ({
   dateOfBirth: user.dateOfBirth || null,
   avatarUrl: user.avatarUrl || "",
   role: user.role,
+  mustChangePassword: Boolean(user.mustChangePassword),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -199,16 +201,20 @@ export const getMe = (req, res) => {
   return res.status(200).json({ user: sanitizeUser(req.user) });
 };
 
-const getGoogleConfig = () => ({
-  clientId: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri:
-    process.env.GOOGLE_OAUTH_REDIRECT_URI ||
-    "http://localhost:3000/api/auth/google/callback",
-});
+const getGoogleConfig = async () => {
+  const secrets = await getIntegrationSecrets(IntegrationSettings);
+  return {
+    clientId: secrets.googleClientId || process.env.GOOGLE_CLIENT_ID,
+    clientSecret:
+      secrets.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri:
+      secrets.googleOauthRedirectUri ||
+      process.env.GOOGLE_OAUTH_REDIRECT_URI ||
+      "http://localhost:3000/api/auth/google/callback",
+  };
+};
 
-const isGoogleLoginEnabled = async () => {
-  const googleConfig = getGoogleConfig();
+const isGoogleLoginEnabled = async (googleConfig) => {
   const settings = await IntegrationSettings.findOne({ key: "default" }).lean();
   return Boolean(
     settings?.googleLogin &&
@@ -220,8 +226,8 @@ const isGoogleLoginEnabled = async () => {
 
 export const googleLogin = async (req, res, next) => {
   try {
-    const googleConfig = getGoogleConfig();
-    if (!(await isGoogleLoginEnabled())) {
+    const googleConfig = await getGoogleConfig();
+    if (!(await isGoogleLoginEnabled(googleConfig))) {
       return res.status(403).json({ message: "Google login is currently disabled." });
     }
 
@@ -242,8 +248,8 @@ export const googleLogin = async (req, res, next) => {
 export const googleCallback = async (req, res, next) => {
   const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
   try {
-    const googleConfig = getGoogleConfig();
-    if (!(await isGoogleLoginEnabled())) {
+    const googleConfig = await getGoogleConfig();
+    if (!(await isGoogleLoginEnabled(googleConfig))) {
       return res.redirect(`${frontendUrl}/login?google_error=disabled`);
     }
     if (!req.query.code) {
