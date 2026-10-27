@@ -8,7 +8,10 @@ export const verifyRecaptcha = () => async (req, res, next) => {
   try {
     integrationSecrets = await getIntegrationSecrets(IntegrationSettings);
   } catch (error) {
-    console.error("Could not load encrypted integration settings:", error.message);
+    console.error(
+      "Could not load encrypted integration settings:",
+      error.message,
+    );
     return fail(res, 503, "Security settings are temporarily unavailable.");
   }
   const secret =
