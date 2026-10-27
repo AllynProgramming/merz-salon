@@ -14,9 +14,14 @@ export const encryptSecret = (value) => {
   if (!value) return "";
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(algorithm, getKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(value, "utf8"),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
-  return [iv, tag, encrypted].map((part) => part.toString("base64url")).join(".");
+  return [iv, tag, encrypted]
+    .map((part) => part.toString("base64url"))
+    .join(".");
 };
 
 export const decryptSecret = (value) => {

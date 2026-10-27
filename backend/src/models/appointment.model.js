@@ -8,8 +8,24 @@ const appointmentSchema = new mongoose.Schema(
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
       index: true,
+    },
+    walkInCustomer: {
+      name: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+      },
+      phone: {
+        type: String,
+        trim: true,
+        maxlength: 30,
+      },
+      email: {
+        type: String,
+        trim: true,
+        maxlength: 254,
+      },
     },
     service: {
       type: mongoose.Schema.Types.ObjectId,

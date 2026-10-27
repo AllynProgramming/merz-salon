@@ -112,7 +112,18 @@ const createAppointmentSchema = z
 
 const createStaffAppointmentSchema = z
   .object({
-    customerId: z.string().regex(objectIdPattern, "Choose a valid customer."),
+    customerId: z
+      .string()
+      .regex(objectIdPattern, "Choose a valid customer.")
+      .optional(),
+    walkInCustomer: z
+      .object({
+        name: z.string().trim().min(2).max(120),
+        phone: z.string().trim().min(7).max(30),
+        email: z.string().trim().max(254).email().optional().or(z.literal("")),
+      })
+      .strict()
+      .optional(),
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
     startTime: z.string().regex(timePattern, "Choose a valid time."),
@@ -592,8 +603,11 @@ export const listAppointments = async (req, res, next) => {
       return {
         _id: appointment._id,
         ...(isStaffView && {
-          customerId: String(appointment.customer?._id || appointment.customer),
+          customerId: appointment.customer
+            ? String(appointment.customer?._id || appointment.customer)
+            : null,
           customerName:
+            appointment.walkInCustomer?.name ||
             appointment.customer?.name ||
             [appointment.customer?.firstname, appointment.customer?.lastname]
               .filter(Boolean)
@@ -985,13 +999,22 @@ export const createStaffAppointment = async (req, res, next) => {
   }
 
   try {
-    const { customerId, serviceId, date, startTime } = validation.data;
+    const { customerId, walkInCustomer, serviceId, date, startTime } =
+      validation.data;
+    if ((!customerId && !walkInCustomer) || (customerId && walkInCustomer)) {
+      return res.status(400).json({
+        message: "Choose a registered customer or provide walk-in details.",
+      });
+    }
+
     const [customer, service] = await Promise.all([
-      User.findOne({ _id: customerId, role: "customer" }).select("_id"),
+      customerId
+        ? User.findOne({ _id: customerId, role: "customer" }).select("_id")
+        : null,
       Service.findOne({ _id: serviceId, isActive: true }),
     ]);
 
-    if (!customer) {
+    if (customerId && !customer) {
       return res.status(404).json({ message: "Customer account not found." });
     }
     if (!service) {
@@ -1006,7 +1029,18 @@ export const createStaffAppointment = async (req, res, next) => {
     const appointment = await withBookingDateLock(date, async () => {
       const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
       const newAppointment = new Appointment({
-        customer: customer._id,
+        ...(customer ? { customer: customer._id } : {}),
+        ...(walkInCustomer
+          ? {
+              walkInCustomer: {
+                name: walkInCustomer.name,
+                phone: walkInCustomer.phone,
+                ...(walkInCustomer.email
+                  ? { email: walkInCustomer.email }
+                  : {}),
+              },
+            }
+          : {}),
         service: service._id,
         date: appointmentDate,
         bookingReference,
@@ -1034,7 +1068,10 @@ export const createStaffAppointment = async (req, res, next) => {
       await newAppointment.save();
       return newAppointment;
     });
-    await appointment.populate("staff", "name firstname lastname");
+    await appointment.populate([
+      { path: "customer", select: "name firstname lastname" },
+      { path: "staff", select: "name firstname lastname" },
+    ]);
 
     await createAppointmentNotifications({
       appointment,
@@ -1060,6 +1097,14 @@ export const createStaffAppointment = async (req, res, next) => {
         serviceName: service.name,
         servicePrice: service.price,
         durationMinutes: service.durationMinutes,
+        customerName:
+          appointment.walkInCustomer?.name ||
+          appointment.customer?.name ||
+          [appointment.customer?.firstname, appointment.customer?.lastname]
+            .filter(Boolean)
+            .join(" ") ||
+          "Registered customer",
+        isWalkIn: Boolean(appointment.walkInCustomer?.name),
         staffName: getStaffDisplayName(appointment.staff),
         date: appointment.date,
         startTime: appointment.startTime,
