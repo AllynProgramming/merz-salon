@@ -67,7 +67,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "staff", "admin"],
+      enum: ["customer", "staff", "manager", "admin"],
       default: "customer",
     },
     workingHours: {

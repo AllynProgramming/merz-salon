@@ -10,20 +10,25 @@ const createStaffSchema = z
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().email().max(254),
     phone: z.string().trim().min(7).max(30),
+    role: z.enum(["staff", "manager", "admin"]).default("staff"),
   })
   .strict();
 
 const updateStaffSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
+    email: z.string().trim().email().max(254).optional(),
     phone: z.string().trim().min(7).max(30).optional(),
+    role: z.enum(["staff", "manager", "admin"]).optional(),
     resetPassword: z.boolean().optional().default(false),
   })
   .strict()
   .refine(
     (data) =>
       data.name !== undefined ||
+      data.email !== undefined ||
       data.phone !== undefined ||
+      data.role !== undefined ||
       data.resetPassword,
     "Provide a name, phone number, or password reset.",
   );
@@ -65,7 +70,7 @@ export const createStaff = async (req, res, next) => {
     });
   }
 
-  const { name, phone } = validation.data;
+  const { name, phone, role } = validation.data;
   const email = validation.data.email.toLowerCase();
   const [firstname, ...lastname] = name.split(/\s+/);
   const temporaryPassword = `Merz-${crypto.randomBytes(6).toString("base64url")}`;
@@ -90,7 +95,7 @@ export const createStaff = async (req, res, next) => {
       phoneNumber: phone,
       password: hashedPassword,
       mustChangePassword: true,
-      role: "staff",
+      role,
     });
 
     return res.status(201).json({
@@ -101,6 +106,7 @@ export const createStaff = async (req, res, next) => {
         name: staff.name,
         email: staff.email,
         phone: staff.phone,
+        role: staff.role,
         workingHours: staff.workingHours || [],
       },
     });
@@ -116,8 +122,8 @@ export const createStaff = async (req, res, next) => {
 
 export const listStaff = async (req, res, next) => {
   try {
-    const staff = await User.find({ role: "staff" })
-      .select("name firstname lastname email phone phoneNumber workingHours")
+    const staff = await User.find({ role: { $in: ["staff", "manager", "admin"] } })
+      .select("name firstname lastname email phone phoneNumber role workingHours")
       .sort({ name: 1 })
       .lean();
 
@@ -130,6 +136,7 @@ export const listStaff = async (req, res, next) => {
           member.email,
         email: member.email,
         phone: member.phone || member.phoneNumber || "",
+        role: member.role,
         workingHours: member.workingHours || [],
       })),
     });
@@ -150,7 +157,9 @@ export const updateStaff = async (req, res, next) => {
     });
   }
 
-  const { name, phone, resetPassword } = validation.data;
+  const { name, email: submittedEmail, phone, role, resetPassword } =
+    validation.data;
+  const email = submittedEmail?.toLowerCase();
   const temporaryPassword = resetPassword
     ? `Merz-${crypto.randomBytes(6).toString("base64url")}`
     : null;
@@ -167,6 +176,17 @@ export const updateStaff = async (req, res, next) => {
         message: "An account with this phone number already exists.",
       });
     }
+    const duplicateEmail = email
+      ? await User.findOne({
+          _id: { $ne: req.params.id },
+          email,
+        })
+      : null;
+    if (duplicateEmail) {
+      return res.status(409).json({
+        message: "An account with this email address already exists.",
+      });
+    }
 
     const updates = {};
     if (name !== undefined) {
@@ -179,17 +199,21 @@ export const updateStaff = async (req, res, next) => {
       updates.phone = phone;
       updates.phoneNumber = phone;
     }
+    if (email !== undefined) updates.email = email;
+    if (role !== undefined) updates.role = role;
     if (temporaryPassword) {
       updates.password = await bcrypt.hash(temporaryPassword, 12);
       updates.mustChangePassword = true;
     }
 
     const staff = await User.findOneAndUpdate(
-      { _id: req.params.id, role: "staff" },
+      { _id: req.params.id, role: { $in: ["staff", "manager", "admin"] } },
       { $set: updates },
       { new: true, runValidators: true },
     )
-      .select("name firstname lastname email phone phoneNumber workingHours mustChangePassword")
+      .select(
+        "name firstname lastname email phone phoneNumber role workingHours mustChangePassword",
+      )
       .lean();
 
     if (!staff) {
@@ -207,6 +231,7 @@ export const updateStaff = async (req, res, next) => {
           staff.email,
         email: staff.email,
         phone: staff.phone || staff.phoneNumber || "",
+        role: staff.role,
         mustChangePassword: Boolean(staff.mustChangePassword),
         workingHours: staff.workingHours || [],
       },
@@ -272,7 +297,7 @@ export const updateStaffWorkingHours = async (req, res, next) => {
     }
 
     const staff = await User.findOneAndUpdate(
-      { _id: req.params.id, role: "staff" },
+      { _id: req.params.id, role: { $in: ["staff", "manager", "admin"] } },
       { $set: { workingHours: validation.data.workingHours } },
       { new: true, runValidators: true },
     )

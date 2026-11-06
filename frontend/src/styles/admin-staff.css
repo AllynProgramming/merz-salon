@@ -74,7 +74,33 @@
   font-size: 14px;
 }
 
+.admin-staff__form select,
+.admin-staff__edit-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(32, 86, 56, 0.24);
+  border-radius: 3px;
+  background: #fff;
+  color: #183d2c;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-staff__edit-form select {
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .admin-staff__form input:focus-visible {
+  border-color: #205638;
+  outline: 2px solid rgba(32, 86, 56, 0.3);
+  outline-offset: 2px;
+}
+
+.admin-staff__form select:focus-visible,
+.admin-staff__edit-form select:focus-visible {
   border-color: #205638;
   outline: 2px solid rgba(32, 86, 56, 0.3);
   outline-offset: 2px;

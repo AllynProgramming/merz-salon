@@ -558,7 +558,7 @@ function AdminSchedulePage() {
           </div>
         </header>
 
-        {["staff", "admin"].includes(user?.role) && (
+        {["staff", "manager", "admin"].includes(user?.role) && (
           <p className="admin-schedule__staff-note">
             You can cancel pending or confirmed appointments before their
             scheduled start time. Pending bookings stay held briefly after their

@@ -297,7 +297,7 @@ function UserMenu() {
           >
             {isCustomer
               ? "Dashboard"
-              : user?.role === "staff"
+              : ["staff", "manager"].includes(user?.role)
                 ? "Staff Dashboard"
                 : "Admin Dashboard"}
           </NavLink>

@@ -425,7 +425,7 @@ const getCalculatedAvailabilityForService = async ({
     Appointment.find(appointmentQuery)
       .select("startTime endTime staff")
       .lean(),
-    User.find({ role: "staff" })
+    User.find({ role: { $in: ["staff", "manager"] } })
       .select("workingHours")
       .sort({ _id: 1 })
       .lean(),
@@ -504,7 +504,7 @@ export const listAppointments = async (req, res, next) => {
       page = 1,
       limit = 10,
     } = validation.data;
-    const isStaffView = ["staff", "admin"].includes(req.user.role);
+    const isStaffView = ["staff", "manager", "admin"].includes(req.user.role);
     const filters = isStaffView ? [] : [{ customer: req.user.id }];
 
     if (status) {
@@ -723,7 +723,7 @@ export const assignAppointmentStaff = async (req, res, next) => {
 
     const staff = await User.findOne({
       _id: staffId,
-      role: "staff",
+      role: { $in: ["staff", "manager"] },
     }).select("name firstname lastname workingHours");
     if (!staff) {
       return res.status(404).json({ message: "Staff member not found." });
@@ -959,7 +959,9 @@ export const getAvailabilityCalendar = async (req, res, next) => {
       })
         .select("date startTime endTime staff")
         .lean(),
-      User.find({ role: "staff" }).select("workingHours").lean(),
+      User.find({ role: { $in: ["staff", "manager"] } })
+        .select("workingHours")
+        .lean(),
     ]);
     const appointmentsByDate = new Map();
 
@@ -1362,7 +1364,7 @@ export const confirmAppointment = async (req, res, next) => {
       });
     }
 
-    if (req.user.role === "staff") {
+    if (["staff", "manager"].includes(req.user.role)) {
       if (
         appointment.staff &&
         String(appointment.staff) !== String(req.user.id)
@@ -1416,7 +1418,9 @@ export const confirmAppointment = async (req, res, next) => {
 
     const confirmationUpdate = {
       status: APPOINTMENT_STATUS.CONFIRMED,
-      ...(req.user.role === "staff" && { staff: req.user.id }),
+      ...(["staff", "manager"].includes(req.user.role) && {
+        staff: req.user.id,
+      }),
     };
     const confirmedAppointment = await Appointment.findOneAndUpdate(
       { _id: appointment._id, status: APPOINTMENT_STATUS.PENDING },

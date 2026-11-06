@@ -34,7 +34,7 @@ export const requireCustomer = (req, res, next) => {
 };
 
 export const requireStaffOrAdmin = (req, res, next) => {
-  if (!req.user || !["staff", "admin"].includes(req.user.role)) {
+  if (!req.user || !["staff", "manager", "admin"].includes(req.user.role)) {
     return res.status(403).json({ message: "Staff access is required" });
   }
 
@@ -42,7 +42,10 @@ export const requireStaffOrAdmin = (req, res, next) => {
 };
 
 export const requirePasswordChangeComplete = (req, res, next) => {
-  if (req.user?.role === "staff" && req.user.mustChangePassword) {
+  if (
+    ["staff", "manager", "admin"].includes(req.user?.role) &&
+    req.user.mustChangePassword
+  ) {
     return res.status(403).json({
       message: "Change your temporary password before using the staff dashboard.",
       code: "PASSWORD_CHANGE_REQUIRED",

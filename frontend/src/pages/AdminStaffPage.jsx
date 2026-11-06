@@ -11,7 +11,26 @@ const emptyForm = {
   name: "",
   email: "",
   phone: "",
+  role: "staff",
 };
+
+const roleOptions = [
+  {
+    value: "staff",
+    label: "Staff",
+    description: "Appointments and day-to-day schedule work.",
+  },
+  {
+    value: "manager",
+    label: "Manager",
+    description: "Staff workspace with expanded operational responsibility.",
+  },
+  {
+    value: "admin",
+    label: "Admin",
+    description: "Full control, including team accounts and settings.",
+  },
+];
 
 async function requestStaff(path, token, options = {}) {
   const response = await fetch(path, {
@@ -40,7 +59,12 @@ function AdminStaffPage() {
   const [notice, setNotice] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [editingId, setEditingId] = useState("");
-  const [editDraft, setEditDraft] = useState({ name: "", phone: "" });
+  const [editDraft, setEditDraft] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "staff",
+  });
   const [editingSaving, setEditingSaving] = useState(false);
 
   useEffect(() => {
@@ -88,6 +112,7 @@ function AdminStaffPage() {
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.trim(),
+          role: form.role,
         }),
       });
       setStaff((current) =>
@@ -109,7 +134,12 @@ function AdminStaffPage() {
 
   const startEditing = (member) => {
     setEditingId(member._id);
-    setEditDraft({ name: member.name, phone: member.phone || "" });
+    setEditDraft({
+      name: member.name,
+      email: member.email,
+      phone: member.phone || "",
+      role: member.role || "staff",
+    });
     setError("");
     setNotice("");
     setTemporaryPassword("");
@@ -128,7 +158,9 @@ function AdminStaffPage() {
           method: "PUT",
           body: JSON.stringify({
             name: editDraft.name.trim(),
+            email: editDraft.email.trim(),
             phone: editDraft.phone.trim(),
+            role: editDraft.role,
           }),
         },
       );
@@ -224,7 +256,8 @@ function AdminStaffPage() {
           <section className="customer-panel admin-staff__form-panel">
             <h2>Add a team member</h2>
             <p>
-              Their account will have staff access to appointments and schedules.
+              Create the sign-in, then choose the level of access that fits the
+              role.
             </p>
             <form className="admin-staff__form" onSubmit={submit}>
               <label>
@@ -264,6 +297,20 @@ function AdminStaffPage() {
                   required
                 />
               </label>
+              <label>
+                Access level
+                <select
+                  name="role"
+                  value={form.role}
+                  onChange={updateField}
+                >
+                  {roleOptions.map((option) => (
+                    <option value={option.value} key={option.value}>
+                      {option.label} — {option.description}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className="admin-staff__hint">
                 A temporary password will be generated after you create the
                 account. The team member must replace it at first sign-in.
@@ -285,7 +332,7 @@ function AdminStaffPage() {
             <div className="admin-staff__list-heading">
               <div>
                 <h2 id="admin-staff-list-heading">Your team</h2>
-                <p>Staff accounts with access to the salon schedule.</p>
+                <p>                Team accounts with access matched to their role.</p>
               </div>
               <span>{staff.length}</span>
             </div>
@@ -324,6 +371,22 @@ function AdminStaffPage() {
                           />
                         </label>
                         <label>
+                          Email
+                          <input
+                            type="email"
+                            value={editDraft.email}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                email: event.target.value,
+                              }))
+                            }
+                            autoComplete="email"
+                            maxLength="254"
+                            required
+                          />
+                        </label>
+                        <label>
                           Phone
                           <input
                             value={editDraft.phone}
@@ -337,6 +400,24 @@ function AdminStaffPage() {
                             maxLength="30"
                             required
                           />
+                        </label>
+                        <label>
+                          Access level
+                          <select
+                            value={editDraft.role}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                role: event.target.value,
+                              }))
+                            }
+                          >
+                            {roleOptions.map((option) => (
+                              <option value={option.value} key={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </label>
                         <span className="admin-staff__member-email">
                           Email: {member.email}
@@ -361,7 +442,10 @@ function AdminStaffPage() {
                           <span>{member.email}</span>
                           <span>{member.phone || "No phone number"}</span>
                         </span>
-                        <span className="admin-staff__role">Staff</span>
+                        <span className="admin-staff__role">
+                          {roleOptions.find((option) => option.value === member.role)?.label ||
+                            "Staff"}
+                        </span>
                         <div className="admin-staff__member-actions">
                           <button type="button" onClick={() => startEditing(member)}>
                             Edit

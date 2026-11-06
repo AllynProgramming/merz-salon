@@ -174,7 +174,7 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const allowedRoles = ["customer", "staff", "admin"];
+    const allowedRoles = ["customer", "staff", "manager", "admin"];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({ message: "This account is not allowed to sign in here." });
     }

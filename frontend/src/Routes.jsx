@@ -47,7 +47,7 @@ function Routes() {
       ],
     },
     {
-      element: <ProtectedRoute allowedRoles={["staff", "admin"]} />,
+      element: <ProtectedRoute allowedRoles={["staff", "manager", "admin"]} />,
       children: [
         { path: "/staff/change-password", element: <StaffChangePasswordPage /> },
         { path: "/admin/schedule", element: <AdminSchedulePage /> },
@@ -60,7 +60,7 @@ function Routes() {
       ],
     },
     {
-      element: <ProtectedRoute allowedRoles={["staff"]} />,
+      element: <ProtectedRoute allowedRoles={["staff", "manager"]} />,
       children: [{ path: "/staff", element: <AdminDashboardPage /> }],
     },
     {

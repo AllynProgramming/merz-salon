@@ -132,7 +132,11 @@ function AdminDashboardPage() {
       <AdminNavigation />
       <Helmet>
         <title>
-          {`${user?.role === "admin" ? "Admin Dashboard" : "Staff Dashboard"} | MERZ Beauty Salon`}
+          {`${user?.role === "admin"
+            ? "Admin Dashboard"
+            : user?.role === "manager"
+              ? "Manager Dashboard"
+              : "Staff Dashboard"} | MERZ Beauty Salon`}
         </title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
@@ -141,7 +145,11 @@ function AdminDashboardPage() {
           <div>
             <p className="customer-eyebrow">Salon operations</p>
             <h1>
-              {user?.role === "admin" ? "Admin Dashboard" : "Staff Dashboard"}
+              {user?.role === "admin"
+                ? "Admin Dashboard"
+                : user?.role === "manager"
+                  ? "Manager Dashboard"
+                  : "Staff Dashboard"}
             </h1>
             <p className="customer-lede">
               Welcome back, {user?.name || user?.firstname || "Team member"}.

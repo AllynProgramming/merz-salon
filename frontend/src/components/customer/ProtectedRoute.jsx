@@ -25,7 +25,7 @@ function ProtectedRoute({ allowedRoles = ["customer"] }) {
   }
 
   if (
-    user.role === "staff" &&
+    ["staff", "manager", "admin"].includes(user.role) &&
     user.mustChangePassword &&
     location.pathname !== "/staff/change-password"
   ) {
