@@ -26,6 +26,7 @@ const emptyForm = {
 function AdminServicesPage() {
   const { token } = useAuth();
   const [services, setServices] = useState([]);
+  const [serviceFilter, setServiceFilter] = useState("all");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -165,6 +166,14 @@ function AdminServicesPage() {
     }
   };
 
+  const availableCount = services.filter((service) => service.isActive).length;
+  const archivedCount = services.length - availableCount;
+  const filteredServices = services.filter((service) => {
+    if (serviceFilter === "available") return service.isActive;
+    if (serviceFilter === "archived") return !service.isActive;
+    return true;
+  });
+
   return (
     <div className="customer-page salon-landing admin-services-page">
       <AdminNavigation />
@@ -284,7 +293,30 @@ function AdminServicesPage() {
         <section className="customer-panel admin-services__list-panel">
           <div className="customer-panel-header">
             <h2>Service menu</h2>
-            <span>{services.filter((service) => service.isActive).length} active</span>
+            <span>
+              {availableCount} available · {archivedCount} archived
+            </span>
+          </div>
+          <div
+            className="admin-services__filters"
+            role="group"
+            aria-label="Filter services"
+          >
+            {[
+              { value: "all", label: `All services (${services.length})` },
+              { value: "available", label: `Available (${availableCount})` },
+              { value: "archived", label: `Archived (${archivedCount})` },
+            ].map((filter) => (
+              <button
+                className={`admin-services__filter${serviceFilter === filter.value ? " is-selected" : ""}`}
+                type="button"
+                key={filter.value}
+                aria-pressed={serviceFilter === filter.value}
+                onClick={() => setServiceFilter(filter.value)}
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
           {loading ? (
             <p role="status">Loading services…</p>
@@ -292,9 +324,13 @@ function AdminServicesPage() {
             <p className="customer-empty-state">
               No services yet. Add your first service using the form above.
             </p>
+          ) : filteredServices.length === 0 ? (
+            <p className="customer-empty-state">
+              No {serviceFilter} services to show.
+            </p>
           ) : (
             <div className="admin-services__list">
-              {services.map((service) => (
+              {filteredServices.map((service) => (
                 <article
                   className={`admin-services__item${service.isActive ? "" : " is-archived"}`}
                   key={service._id}
@@ -305,7 +341,7 @@ function AdminServicesPage() {
                       <span
                         className={`admin-services__status${service.isActive ? " is-active" : ""}`}
                       >
-                        {service.isActive ? "Active" : "Archived"}
+                        {service.isActive ? "Available" : "Archived"}
                       </span>
                     </div>
                     <p>

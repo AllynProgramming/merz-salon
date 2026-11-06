@@ -81,6 +81,41 @@
   font-size: 12px;
 }
 
+.admin-services__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-services__filter {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid rgba(32, 86, 56, 0.22);
+  border-radius: 3px;
+  background: #fff;
+  color: #354e3c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admin-services__filter:hover {
+  border-color: #205638;
+}
+
+.admin-services__filter.is-selected {
+  border-color: #205638;
+  background: #205638;
+  color: #fff;
+}
+
+.admin-services__filter:focus-visible {
+  outline: 2px solid rgba(32, 86, 56, 0.35);
+  outline-offset: 2px;
+}
+
 .admin-services__list {
   border-top: 1px solid rgba(32, 86, 56, 0.14);
 }
