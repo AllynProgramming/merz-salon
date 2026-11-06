@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth.js";
 
@@ -19,6 +19,10 @@ function StaffNotificationBell() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [popup, setPopup] = useState(null);
+  const knownNotificationIds = useRef(new Set());
+  const hasLoadedNotifications = useRef(false);
+  const popupTimeout = useRef(null);
 
   const loadNotifications = useCallback(async () => {
     if (!token) return;
@@ -28,7 +32,7 @@ function StaffNotificationBell() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [notificationResponse, countResponse] = await Promise.all([
-        fetch("/api/notifications?limit=5", { headers }),
+        fetch("/api/notifications?limit=20", { headers }),
         fetch("/api/notifications/unread-count", { headers }),
       ]);
       const [notificationData, countData] = await Promise.all([
@@ -37,6 +41,33 @@ function StaffNotificationBell() {
       ]);
 
       setNotifications(notificationData.items || []);
+      const nextNotifications = notificationData.items || [];
+      const isInitialLoad = !hasLoadedNotifications.current;
+      const recentReminder = nextNotifications.find((notification) => {
+        if (notification.isRead || notification.type !== "reminder") return false;
+        const createdAt = new Date(notification.createdAt).getTime();
+        return (
+          Number.isFinite(createdAt) &&
+          Date.now() - createdAt <= 10 * 60 * 1000
+        );
+      });
+      const newReminder = !isInitialLoad
+        ? nextNotifications.find(
+            (notification) =>
+              !notification.isRead &&
+              notification.type === "reminder" &&
+              !knownNotificationIds.current.has(notification._id),
+          )
+        : null;
+      knownNotificationIds.current = new Set(
+        nextNotifications.map((notification) => notification._id),
+      );
+      hasLoadedNotifications.current = true;
+      if (newReminder || (isInitialLoad && recentReminder)) {
+        setPopup(newReminder || recentReminder);
+        if (popupTimeout.current) window.clearTimeout(popupTimeout.current);
+        popupTimeout.current = window.setTimeout(() => setPopup(null), 15000);
+      }
       setUnreadCount(Number(countData.unreadCount || 0));
     } catch (requestError) {
       setError(requestError.message || "Could not load notifications.");
@@ -47,10 +78,11 @@ function StaffNotificationBell() {
 
   useEffect(() => {
     const initialLoadId = window.setTimeout(loadNotifications, 0);
-    const intervalId = window.setInterval(loadNotifications, 30000);
+    const intervalId = window.setInterval(loadNotifications, 10000);
     return () => {
       window.clearTimeout(initialLoadId);
       window.clearInterval(intervalId);
+      if (popupTimeout.current) window.clearTimeout(popupTimeout.current);
     };
   }, [loadNotifications]);
 
@@ -79,6 +111,23 @@ function StaffNotificationBell() {
 
   return (
     <div className="staff-notification">
+      {popup && (
+        <div
+          className="staff-notification__popup"
+          role="alert"
+          aria-live="assertive"
+        >
+          <strong>{popup.title}</strong>
+          <span>{popup.message}</span>
+          <button
+            type="button"
+            onClick={() => setPopup(null)}
+            aria-label="Dismiss reminder"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <button
         aria-expanded={open}
         aria-haspopup="true"

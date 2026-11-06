@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import useAuth from "../context/useAuth.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
+import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 
@@ -157,17 +158,12 @@ function AdminDashboardPage() {
             </p>
           </div>
           <div className="admin-dashboard__heading-actions">
+            <StaffNotificationBell />
             <Link
               className="customer-button customer-button-primary"
               to="/staff/book-appointment"
             >
               Book appointment
-            </Link>
-            <Link
-              className="customer-button customer-button-outline"
-              to="/admin/schedule"
-            >
-              Open schedule
             </Link>
           </div>
         </header>

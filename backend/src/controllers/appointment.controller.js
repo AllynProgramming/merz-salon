@@ -1196,6 +1196,57 @@ export const createStaffAppointment = async (req, res, next) => {
   }
 };
 
+export const createReminderTestAppointments = async (req, res, next) => {
+  try {
+    const service = await Service.findOne({ isActive: true }).sort({ name: 1 });
+    if (!service) {
+      return res.status(404).json({ message: "No active service is available." });
+    }
+
+    const salonNow = getSalonClock();
+    const testAppointments = [5, 10].map((offset, index) => {
+      const startMinutes = salonNow.minutes + offset;
+      const startTime = formatTime(startMinutes);
+      const bookingReference = `TEST-${Date.now()}-${index}`;
+      const appointment = new Appointment({
+        walkInCustomer: {
+          name: `Reminder test ${index + 1}`,
+          phone: `TEST-${Date.now()}-${index}`,
+        },
+        service: service._id,
+        date: normalizeDateValue(salonNow.date),
+        bookingReference,
+        startTime,
+        endTime: formatTime(startMinutes + Number(service.durationMinutes || 30)),
+        priceSnapshot: service.price,
+        durationMinutes: Number(service.durationMinutes || 30),
+        status: APPOINTMENT_STATUS.CONFIRMED,
+        staff: req.user.id,
+        statusHistory: [
+          {
+            status: APPOINTMENT_STATUS.CONFIRMED,
+            changedBy: String(req.user.id),
+            note: "Created for reminder popup testing.",
+          },
+        ],
+      });
+      return appointment;
+    });
+
+    const savedAppointments = await Appointment.create(testAppointments);
+    return res.status(201).json({
+      message: "Created two reminder test appointments.",
+      appointments: savedAppointments.map((appointment) => ({
+        id: appointment._id,
+        date: salonNow.date,
+        startTime: appointment.startTime,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getStaffAppointment = async (req, res, next) => {
   const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
   if (!validation.success) {

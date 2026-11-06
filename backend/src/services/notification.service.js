@@ -130,6 +130,27 @@ export async function createStaffAssignmentNotification({
   });
 }
 
+export async function createStaffAppointmentReminderNotification({
+  appointment,
+  reminderType,
+}) {
+  if (!appointment?.staff || !appointment?._id) return null;
+
+  const isDue = reminderType === "staff_due";
+  const customerName =
+    appointment.customer?.name || appointment.walkInCustomer?.name || "your client";
+
+  return createNotification({
+    userId: appointment.staff?._id || appointment.staff,
+    appointmentId: appointment._id,
+    type: "reminder",
+    title: isDue ? "Appointment time" : "Appointment in 5 minutes",
+    message: isDue
+      ? `${customerName}'s ${appointment.service?.name || "appointment"} starts now at ${appointment.startTime}.`
+      : `${customerName}'s ${appointment.service?.name || "appointment"} starts in 5 minutes at ${appointment.startTime}.`,
+  });
+}
+
 export async function syncReminderState(appointmentId, reminderType) {
   const appointment = await Appointment.findById(appointmentId);
   if (!appointment) return null;

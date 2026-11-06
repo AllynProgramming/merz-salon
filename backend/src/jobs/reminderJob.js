@@ -15,6 +15,7 @@ import {
 } from "../utils/appointmentStatus.js";
 import {
   createAppointmentNotifications,
+  createStaffAppointmentReminderNotification,
   syncReminderState,
 } from "../services/notification.service.js";
 import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
@@ -142,12 +143,13 @@ export const sendAppointmentReminders = async () => {
   const upcoming = await Appointment.find({
     status: { $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED] },
     date: {
-      $gte: new Date(now.getTime() - 1000 * 60 * 60 * 6),
+      $gte: new Date(now.getTime() - 1000 * 60 * 60 * 48),
       $lte: new Date(now.getTime() + 1000 * 60 * 60 * 48),
     },
   })
     .populate("customer", "name email")
     .populate("service", "name")
+    .populate("staff", "name")
     .lean();
 
   for (const appointment of upcoming) {
@@ -165,6 +167,16 @@ export const sendAppointmentReminders = async () => {
 
     const hoursUntil = (startTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     const reminderTypes = [];
+
+    const appointmentDateKey = appointmentDate.toISOString().slice(0, 10);
+    const salonNow = getSalonClock(now);
+    const appointmentDay = new Date(`${appointmentDateKey}T00:00:00.000Z`);
+    const salonToday = new Date(`${salonNow.date}T00:00:00.000Z`);
+    const dayDifference = Math.round(
+      (appointmentDay.getTime() - salonToday.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const appointmentMinutes = hours * 60 + minutes;
+    const minutesUntil = dayDifference * 24 * 60 + appointmentMinutes - salonNow.minutes;
 
     if (
       hoursUntil <= Number(reminderWindowHours.default || 24) &&
@@ -206,6 +218,30 @@ export const sendAppointmentReminders = async () => {
 
       await syncReminderState(String(appointment._id), reminderType);
     }
+
+    const staffReminderId = appointment.staff
+      ? String(appointment.staff._id || appointment.staff)
+      : "";
+    const fiveMinuteReminderKey = `staff_5_minute:${staffReminderId}`;
+    const dueReminderKey = `staff_due:${staffReminderId}`;
+
+    if (appointment.staff && minutesUntil > 0 && minutesUntil <= 5 &&
+        !appointment.remindersSent?.includes(fiveMinuteReminderKey)) {
+      await createStaffAppointmentReminderNotification({
+        appointment,
+        reminderType: "staff_5_minute",
+      });
+      await syncReminderState(String(appointment._id), fiveMinuteReminderKey);
+    }
+
+    if (appointment.staff && minutesUntil <= 0 &&
+        !appointment.remindersSent?.includes(dueReminderKey)) {
+      await createStaffAppointmentReminderNotification({
+        appointment,
+        reminderType: "staff_due",
+      });
+      await syncReminderState(String(appointment._id), dueReminderKey);
+    }
   }
 };
 
@@ -223,7 +259,7 @@ export const startReminderJob = () => {
   }
 
   if (!reminderJob) {
-    reminderJob = cron.schedule("*/15 * * * *", async () => {
+    reminderJob = cron.schedule("* * * * *", async () => {
     try {
       await completePastAppointments();
       await sendAppointmentReminders();

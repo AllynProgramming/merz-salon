@@ -72,6 +72,8 @@ function StaffBookingPage() {
   const [startTime, setStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [creatingReminderTests, setCreatingReminderTests] = useState(false);
+  const [reminderTestMessage, setReminderTestMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -315,6 +317,32 @@ function StaffBookingPage() {
     }
   };
 
+  const createReminderTests = async () => {
+    if (!token || creatingReminderTests) return;
+    setCreatingReminderTests(true);
+    setReminderTestMessage("");
+    setError("");
+    try {
+      const response = await fetch("/api/staff/appointments/test-reminders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not create test reminders.");
+      }
+      setReminderTestMessage(
+        `Created test appointments for ${payload.appointments
+          .map((appointment) => appointment.startTime)
+          .join(" and ")}.`,
+      );
+    } catch (requestError) {
+      setError(requestError.message || "Could not create test reminders.");
+    } finally {
+      setCreatingReminderTests(false);
+    }
+  };
+
   return (
     <div className="booking-page salon-landing staff-booking-page">
       <Helmet>
@@ -331,9 +359,21 @@ function StaffBookingPage() {
               service and appointment time.
             </p>
           </div>
-          <Link className="customer-button customer-button-outline" to="/staff">
-            Back to dashboard
-          </Link>
+          <div className="staff-booking__header-actions">
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={createReminderTests}
+              disabled={creatingReminderTests}
+            >
+              {creatingReminderTests
+                ? "Creating test reminders..."
+                : "Test reminder popups"}
+            </button>
+            <Link className="customer-button customer-button-outline" to="/staff">
+              Back to dashboard
+            </Link>
+          </div>
         </header>
 
         {error && (
@@ -344,6 +384,11 @@ function StaffBookingPage() {
         {servicesError && (
           <div className="booking-state booking-state-error" role="alert">
             {servicesError}
+          </div>
+        )}
+        {reminderTestMessage && (
+          <div className="booking-state booking-state-success" role="status">
+            {reminderTestMessage}
           </div>
         )}
 
