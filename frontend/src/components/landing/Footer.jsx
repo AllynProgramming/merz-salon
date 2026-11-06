@@ -10,7 +10,7 @@ function Footer() {
             Corner Grema Subdivision, Malaybalay City, 8700 Bukidnon,
             Philippines
           </address>
-          <a href="https://merzbeauty.com">merzbeauty.com</a>
+          <a href="tel:+639173022953">+63 917 302 2953</a>
         </div>
         <nav className="salon-footer-links" aria-label="Footer navigation">
           <Link to="/services">Services</Link>
