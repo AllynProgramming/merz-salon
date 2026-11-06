@@ -56,8 +56,8 @@ const appointmentSchema = new mongoose.Schema(
     },
     priceSnapshot: {
       type: Number,
-      required: true,
       min: 0,
+      default: null,
     },
     durationMinutes: {
       type: Number,

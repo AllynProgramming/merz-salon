@@ -641,7 +641,12 @@ export const listAppointments = async (req, res, next) => {
         date: appointment.date,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
-        price: appointment.priceSnapshot ?? appointment.service?.price ?? 0,
+        price:
+          appointment.priceSnapshot === null
+            ? null
+            : (appointment.priceSnapshot ??
+              appointment.service?.price ??
+              null),
         status: appointment.status,
         bookingReference: appointment.bookingReference,
         canReschedule: [
@@ -850,7 +855,11 @@ export const getAppointmentById = async (req, res, next) => {
           appointment.service?.name ||
           "Salon service",
         servicePrice:
-          appointment.priceSnapshot ?? appointment.service?.price ?? 0,
+          appointment.priceSnapshot === null
+            ? null
+            : (appointment.priceSnapshot ??
+              appointment.service?.price ??
+              null),
         staffName: getStaffDisplayName(appointment.staff),
         durationMinutes:
           appointment.durationMinutes ??
@@ -1117,7 +1126,7 @@ export const createStaffAppointment = async (req, res, next) => {
         bookingReference,
         startTime,
         endTime,
-        priceSnapshot: Number(service.price),
+        priceSnapshot: service.price,
         durationMinutes: Number(service.durationMinutes),
         status: APPOINTMENT_STATUS.PENDING,
         staff: slot.staffId,
@@ -1224,7 +1233,10 @@ export const getStaffAppointment = async (req, res, next) => {
             }
           : null,
         serviceName: appointment.service?.name || "Salon service",
-        servicePrice: appointment.priceSnapshot ?? appointment.service?.price,
+        servicePrice:
+          appointment.priceSnapshot === null
+            ? null
+            : (appointment.priceSnapshot ?? appointment.service?.price),
         durationMinutes:
           appointment.durationMinutes ??
           appointment.service?.durationMinutes ??
@@ -1278,7 +1290,7 @@ export const createAppointment = async (req, res, next) => {
         bookingReference,
         startTime,
         endTime,
-        priceSnapshot: Number(service.price),
+        priceSnapshot: service.price,
         durationMinutes: Number(service.durationMinutes),
         status: APPOINTMENT_STATUS.PENDING,
         staff: slot.staffId,

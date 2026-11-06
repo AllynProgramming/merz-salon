@@ -7,6 +7,7 @@ export function formatDuration(minutes) {
 }
 
 export function formatPrice(price) {
+  if (price == null) return "Price varies";
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",

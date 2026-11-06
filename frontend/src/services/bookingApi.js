@@ -607,7 +607,7 @@ export async function getAppointments({
       date: appointment.date,
       startTime: appointment.startTime,
       endTime: appointment.endTime,
-      price: appointment.servicePrice ?? 0,
+      price: appointment.servicePrice ?? null,
       status: appointment.status,
       bookingReference: appointment.bookingReference || appointment._id,
       canReschedule: appointmentPermissions(appointment).canReschedule,

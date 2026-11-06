@@ -109,7 +109,10 @@ function BookingConfirmationPage() {
           appointment.serviceName ||
           appointment.service?.name ||
           "Salon service",
-        price: appointment.servicePrice ?? appointment.service?.price,
+        price:
+          appointment.servicePrice !== undefined
+            ? appointment.servicePrice
+            : appointment.service?.price,
         durationMinutes:
           appointment.durationMinutes ?? appointment.service?.durationMinutes,
       }

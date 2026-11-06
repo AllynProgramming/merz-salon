@@ -77,6 +77,20 @@ export const getAdminReport = async (req, res, next) => {
                   ],
                 },
               },
+              unpricedCompleted: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$status", APPOINTMENT_STATUS.COMPLETED] },
+                        { $eq: ["$priceSnapshot", null] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
             },
           },
           { $sort: { appointments: -1, revenue: -1 } },

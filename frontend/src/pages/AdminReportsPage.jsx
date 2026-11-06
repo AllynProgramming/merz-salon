@@ -169,6 +169,15 @@ function AdminReportsPage() {
                               ? `${service.averageRating.toFixed(1)} / 5 rating`
                               : "No ratings yet"}
                           </span>
+                          {service.unpricedCompleted > 0 && (
+                            <span>
+                              {service.unpricedCompleted} completed{" "}
+                              {service.unpricedCompleted === 1
+                                ? "appointment has"
+                                : "appointments have"}{" "}
+                              a price to confirm
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -19,6 +19,7 @@ const emptyForm = {
   name: "",
   description: "",
   price: "",
+  priceVaries: false,
   durationMinutes: "",
   category: "",
 };
@@ -64,7 +65,8 @@ function AdminServicesPage() {
     setForm({
       name: service.name,
       description: service.description || "",
-      price: String(service.price),
+      price: service.price == null ? "" : String(service.price),
+      priceVaries: service.price == null,
       durationMinutes: String(service.durationMinutes),
       category: service.category || "",
     });
@@ -89,7 +91,7 @@ function AdminServicesPage() {
     const serviceData = {
       name: form.name.trim(),
       description: form.description.trim(),
-      price: Number(form.price),
+      price: form.priceVaries ? null : Number(form.price),
       durationMinutes: Number(form.durationMinutes),
       category: form.category.trim(),
     };
@@ -238,8 +240,24 @@ function AdminServicesPage() {
                 onChange={updateField}
                 min="0"
                 step="0.01"
-                required
+                disabled={form.priceVaries}
+                required={!form.priceVaries}
               />
+            </label>
+            <label className="admin-services__price-varies">
+              <input
+                type="checkbox"
+                checked={form.priceVaries}
+                onChange={(event) => {
+                  setForm((current) => ({
+                    ...current,
+                    priceVaries: event.target.checked,
+                  }));
+                  setError("");
+                  setNotice("");
+                }}
+              />
+              Price varies
             </label>
             <label>
               Duration (minutes)

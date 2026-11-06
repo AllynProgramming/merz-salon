@@ -59,6 +59,21 @@
   outline: 2px solid rgba(32, 86, 56, 0.18);
 }
 
+.admin-services__price-varies {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  gap: 8px !important;
+  min-height: 44px;
+}
+
+.admin-services__price-varies input {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: #205638;
+}
+
 .admin-services__description,
 .admin-services__form-actions {
   grid-column: 1 / -1;

@@ -15,7 +15,10 @@ const serviceInputSchema = z
   .object({
     name: z.string().trim().min(2).max(120),
     description: z.string().trim().max(1000).default(""),
-    price: z.coerce.number().finite().min(0),
+    price: z.preprocess(
+      (value) => (value === null ? null : value),
+      z.coerce.number().finite().min(0).nullable(),
+    ),
     durationMinutes: z.coerce.number().int().min(1).max(600),
     category: z.string().trim().max(60).default(""),
   })

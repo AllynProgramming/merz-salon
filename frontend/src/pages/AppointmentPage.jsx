@@ -133,7 +133,10 @@ function AppointmentPage() {
   const appointmentService = appointment
     ? {
         name: serviceName,
-        price: appointment.servicePrice ?? appointment.service?.price,
+        price:
+          appointment.servicePrice !== undefined
+            ? appointment.servicePrice
+            : appointment.service?.price,
         durationMinutes:
           appointment.durationMinutes ?? appointment.service?.durationMinutes,
       }
