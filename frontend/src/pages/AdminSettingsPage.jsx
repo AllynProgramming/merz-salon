@@ -115,6 +115,8 @@ function AdminSettingsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [credentials, setCredentials] = useState({});
+  const [credentialValues, setCredentialValues] = useState({});
+  const [editingCredential, setEditingCredential] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +189,59 @@ function AdminSettingsPage() {
       setNotice("Settings saved.");
     } catch (requestError) {
       setSettings(settings);
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCredential = async (field) => {
+    const value = credentialValues[field.key];
+    if (!value) return;
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const settingsPayload = Object.fromEntries(
+        Object.entries(settings).filter(
+          ([key]) => !["calendarConnected", "calendarEmail"].includes(key),
+        ),
+      );
+      const payload = await requestSettings("/api/admin/settings", token, {
+        method: "PUT",
+        body: JSON.stringify({ ...settingsPayload, [field.key]: value }),
+      });
+      setCredentials(payload.settings.secretsConfigured || {});
+      setCredentialValues((current) => ({ ...current, [field.key]: "" }));
+      setEditingCredential(null);
+      setNotice(`${field.label} saved.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restoreCredentials = async () => {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const settingsPayload = Object.fromEntries(
+        Object.entries(settings).filter(
+          ([key]) => !["calendarConnected", "calendarEmail"].includes(key),
+        ),
+      );
+      const payload = await requestSettings("/api/admin/settings", token, {
+        method: "PUT",
+        body: JSON.stringify({ ...settingsPayload, resetCredentials: true }),
+      });
+      setCredentials(payload.settings.secretsConfigured || {});
+      setCredentialValues({});
+      setEditingCredential(null);
+      setNotice("Credential defaults restored.");
+    } catch (requestError) {
       setError(requestError.message);
     } finally {
       setSaving(false);
@@ -335,95 +390,86 @@ function AdminSettingsPage() {
           className="customer-panel admin-settings-panel"
           aria-labelledby="admin-credentials-heading"
         >
-          <div className="customer-panel-header">
+          <div className="customer-panel-header admin-credentials-header">
             <div>
               <h2 id="admin-credentials-heading">Integration credentials</h2>
               <p>
                 Credentials are encrypted before they are stored. Existing
-                values are never returned to the browser; leave a field blank to
-                keep it.
+                values are never returned to the browser. Edit one connection
+                at a time when a key needs replacing.
               </p>
             </div>
+            <button
+              className="admin-credentials-reset"
+              type="button"
+              disabled={saving}
+              onClick={restoreCredentials}
+            >
+              Restore defaults
+            </button>
           </div>
-          <div className="admin-settings-credentials">
+          <div className="admin-settings-credentials" aria-label="Integration credential fields">
             {secretFields.map((field) => (
-              <label className="admin-settings-field" key={field.key}>
-                <span>{field.label}</span>
-                <input
-                  type={field.type}
-                  placeholder={
-                    credentials[field.key]
-                      ? "Configured — enter a new value to replace"
-                      : ""
-                  }
-                  autoComplete="new-password"
-                  onChange={(event) =>
-                    setCredentials((current) => ({
-                      ...current,
-                      [field.key]: event.target.value,
-                    }))
-                  }
-                />
-              </label>
+              <div className="admin-credential-item" key={field.key}>
+                <div className="admin-credential-summary">
+                  <div>
+                    <strong>{field.label}</strong>
+                    <span className={credentials[field.key] ? "is-configured" : ""}>
+                      {credentials[field.key] ? "Configured" : "Not configured"}
+                    </span>
+                  </div>
+                  <button
+                    className="admin-credential-edit"
+                    type="button"
+                    aria-expanded={editingCredential === field.key}
+                    aria-controls={`credential-editor-${field.key}`}
+                    disabled={saving}
+                    onClick={() =>
+                      setEditingCredential((current) =>
+                        current === field.key ? null : field.key,
+                      )
+                    }
+                  >
+                    {editingCredential === field.key ? "Close" : "Edit"}
+                  </button>
+                </div>
+                {editingCredential === field.key && (
+                  <div
+                    className="admin-credential-editor"
+                    id={`credential-editor-${field.key}`}
+                  >
+                    <label className="admin-settings-field">
+                      <span>New value for {field.label}</span>
+                      <input
+                        type={field.type}
+                        value={credentialValues[field.key] || ""}
+                        placeholder={
+                          credentials[field.key]
+                            ? "Enter a new value to replace the current one"
+                            : "Enter a value"
+                        }
+                        autoComplete="new-password"
+                        onChange={(event) =>
+                          setCredentialValues((current) => ({
+                            ...current,
+                            [field.key]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <button
+                      className="customer-button customer-button-primary"
+                      type="button"
+                      disabled={saving || !credentialValues[field.key]}
+                      onClick={() => saveCredential(field)}
+                    >
+                      Save {field.label}
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-          <button
-            className="customer-button customer-button-primary"
-            type="button"
-            disabled={saving}
-            onClick={() => {
-              setSaving(true);
-              setError("");
-              setNotice("");
-              const settingsPayload = Object.fromEntries(
-                Object.entries(settings).filter(
-                  ([key]) =>
-                    !["calendarConnected", "calendarEmail"].includes(key),
-                ),
-              );
-              requestSettings("/api/admin/settings", token, {
-                method: "PUT",
-                body: JSON.stringify({
-                  ...settingsPayload,
-                  ...Object.fromEntries(
-                    secretFields
-                      .filter(
-                        ({ key }) =>
-                          credentials[key] &&
-                          typeof credentials[key] === "string",
-                      )
-                      .map(({ key }) => [key, credentials[key]]),
-                  ),
-                }),
-              })
-                .then((payload) => {
-                  const savedSettings = Object.fromEntries(
-                    Object.entries(payload.settings).filter(
-                      ([key]) =>
-                        ![
-                          "secretsConfigured",
-                          "calendarConnected",
-                          "calendarEmail",
-                        ].includes(key),
-                    ),
-                  );
-                  setSettings({
-                    ...initialSettings,
-                    ...savedSettings,
-                    calendarConnected: Boolean(
-                      payload.settings.calendarConnected,
-                    ),
-                    calendarEmail: payload.settings.calendarEmail || "",
-                  });
-                  setCredentials(payload.settings.secretsConfigured || {});
-                  setNotice("Integration credentials saved.");
-                })
-                .catch((requestError) => setError(requestError.message))
-                .finally(() => setSaving(false));
-            }}
-          >
-            Save credentials
-          </button>
         </section>
       </main>
     </div>

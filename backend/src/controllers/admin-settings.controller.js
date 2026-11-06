@@ -23,6 +23,7 @@ const settingsSchema = z
     smtpPass: z.string().max(500).optional(),
     smtpFrom: z.string().trim().max(254).optional(),
     recaptchaSecretKey: z.string().max(500).optional(),
+    resetCredentials: z.boolean().optional(),
   })
   .strict();
 
@@ -50,6 +51,10 @@ const secretFields = [
   "smtpFrom",
   "recaptchaSecretKey",
 ];
+
+const editableSecretFields = secretFields.filter(
+  (field) => field !== "calendarRefreshToken",
+);
 
 const getSettings = async () =>
   IntegrationSettings.findOneAndUpdate(
@@ -92,19 +97,23 @@ export const updateIntegrationSettings = async (req, res, next) => {
     const update = Object.fromEntries(
       settingsFields.map((field) => [field, validation.data[field]]),
     );
+    const unset = {
+      smsNotifications: 1,
+      whatsappNotifications: 1,
+    };
     for (const field of secretFields) {
       if (validation.data[field])
         update[field] = encryptSecret(validation.data[field]);
+    }
+    if (validation.data.resetCredentials) {
+      for (const field of editableSecretFields) unset[field] = 1;
     }
 
     const settings = await IntegrationSettings.findOneAndUpdate(
       { key: "default" },
       {
         $set: update,
-        $unset: {
-          smsNotifications: 1,
-          whatsappNotifications: 1,
-        },
+        $unset: unset,
       },
       {
         new: true,

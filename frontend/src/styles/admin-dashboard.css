@@ -497,10 +497,99 @@
 }
 
 .admin-settings-credentials {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  border-top: 1px solid rgba(32, 86, 56, 0.14);
+}
+
+.admin-credentials-header {
+  align-items: flex-start !important;
+}
+
+.admin-credentials-reset {
+  flex: 0 0 auto;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #8b302b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-credentials-reset:hover:not(:disabled) {
+  color: #6f2420;
+}
+
+.admin-credentials-reset:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.admin-credential-item {
+  border-bottom: 1px solid rgba(32, 86, 56, 0.12);
+}
+
+.admin-credential-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 62px;
+}
+
+.admin-credential-summary > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.admin-credential-summary strong {
+  color: #183d2c;
+  font-size: 13px;
+}
+
+.admin-credential-summary span {
+  color: #8b302b;
+  font-size: 11px;
+}
+
+.admin-credential-summary span.is-configured {
+  color: #52695a;
+}
+
+.admin-credential-edit {
+  min-width: 62px;
+  padding: 7px 12px;
+  border: 1px solid rgba(32, 86, 56, 0.24);
+  background: #fff;
+  color: #205638;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-credential-edit:hover:not(:disabled) {
+  background: #edf4ed;
+}
+
+.admin-credential-edit:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.admin-credential-editor {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 0 0 16px;
+}
+
+.admin-credential-editor .admin-settings-field {
+  flex: 1;
 }
 
 .admin-settings-field {
@@ -532,8 +621,14 @@
 }
 
 @media (max-width: 640px) {
-  .admin-settings-credentials {
-    grid-template-columns: 1fr;
+  .admin-credentials-header,
+  .admin-credential-editor {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .admin-credentials-reset {
+    align-self: flex-start;
   }
 }
 
