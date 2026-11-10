@@ -57,37 +57,65 @@ const integrationItems = [
   },
 ];
 
-const secretFields = [
-  { key: "googleClientId", label: "Google client ID", type: "text" },
+const credentialGroups = [
   {
-    key: "googleClientSecret",
-    label: "Google client secret",
-    type: "password",
+    key: "google-auth",
+    title: "Google sign-in",
+    description: "Client credentials and callback address for customer login.",
+    fields: [
+      { key: "googleClientId", label: "Google client ID", type: "text" },
+      {
+        key: "googleClientSecret",
+        label: "Google client secret",
+        type: "password",
+      },
+      {
+        key: "googleOauthRedirectUri",
+        label: "Google OAuth redirect URI",
+        type: "url",
+      },
+    ],
   },
   {
-    key: "googleOauthRedirectUri",
-    label: "Google OAuth redirect URI",
-    type: "url",
+    key: "google-calendar",
+    title: "Google Calendar",
+    description: "Calendar callback and embedded calendar settings.",
+    fields: [
+      {
+        key: "googleCalendarRedirectUri",
+        label: "Google Calendar redirect URI",
+        type: "url",
+      },
+      {
+        key: "calendarEmbedUrl",
+        label: "Google Calendar embed URL",
+        type: "url",
+      },
+    ],
   },
   {
-    key: "googleCalendarRedirectUri",
-    label: "Google Calendar redirect URI",
-    type: "url",
+    key: "email-delivery",
+    title: "Email delivery",
+    description: "The mail server used for booking updates and reminders.",
+    fields: [
+      { key: "smtpHost", label: "SMTP host", type: "text" },
+      { key: "smtpPort", label: "SMTP port", type: "text" },
+      { key: "smtpUser", label: "SMTP username", type: "text" },
+      { key: "smtpPass", label: "SMTP password", type: "password" },
+      { key: "smtpFrom", label: "Sender email", type: "email" },
+    ],
   },
   {
-    key: "calendarEmbedUrl",
-    label: "Google Calendar embed URL",
-    type: "url",
-  },
-  { key: "smtpHost", label: "SMTP host", type: "text" },
-  { key: "smtpPort", label: "SMTP port", type: "text" },
-  { key: "smtpUser", label: "SMTP username", type: "text" },
-  { key: "smtpPass", label: "SMTP password", type: "password" },
-  { key: "smtpFrom", label: "Sender email", type: "email" },
-  {
-    key: "recaptchaSecretKey",
-    label: "reCAPTCHA secret key",
-    type: "password",
+    key: "recaptcha",
+    title: "reCAPTCHA protection",
+    description: "Secret key for the login security check.",
+    fields: [
+      {
+        key: "recaptchaSecretKey",
+        label: "reCAPTCHA secret key",
+        type: "password",
+      },
+    ],
   },
 ];
 
@@ -117,10 +145,59 @@ function AdminSettingsPage() {
   const [credentials, setCredentials] = useState({});
   const [credentialValues, setCredentialValues] = useState({});
   const [editingCredential, setEditingCredential] = useState(null);
+  const [settingsAccessToken, setSettingsAccessToken] = useState("");
+  const [superPin, setSuperPin] = useState("");
+  const [challengeToken, setChallengeToken] = useState("");
+  const [otp, setOtp] = useState("");
+  const [accessError, setAccessError] = useState("");
+  const [accessLoading, setAccessLoading] = useState(false);
+
+  const requestSettingsAccess = async (event) => {
+    event.preventDefault();
+    setAccessLoading(true);
+    setAccessError("");
+    try {
+      const payload = await requestSettings(
+        "/api/admin/settings/access/request",
+        token,
+        { method: "POST", body: JSON.stringify({ superPin }) },
+      );
+      setChallengeToken(payload.challengeToken);
+      setSuperPin("");
+    } catch (requestError) {
+      setAccessError(requestError.message);
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  const verifySettingsAccess = async (event) => {
+    event.preventDefault();
+    setAccessLoading(true);
+    setAccessError("");
+    try {
+      const payload = await requestSettings(
+        "/api/admin/settings/access/verify",
+        token,
+        { method: "POST", body: JSON.stringify({ challengeToken, otp }) },
+      );
+      setSettingsAccessToken(payload.accessToken);
+      setOtp("");
+    } catch (requestError) {
+      setAccessError(requestError.message);
+    } finally {
+      setAccessLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
-    requestSettings("/api/admin/settings", token)
+    if (!settingsAccessToken) {
+      return undefined;
+    }
+    requestSettings("/api/admin/settings", token, {
+      headers: { "X-Settings-Access-Token": settingsAccessToken },
+    })
       .then((payload) => {
         if (active) {
           const savedSettings = Object.fromEntries(
@@ -151,7 +228,7 @@ function AdminSettingsPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, settingsAccessToken]);
 
   const updateSetting = async (key) => {
     const nextSettings = { ...settings, [key]: !settings[key] };
@@ -167,6 +244,7 @@ function AdminSettingsPage() {
       );
       const payload = await requestSettings("/api/admin/settings", token, {
         method: "PUT",
+        headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify(settingsPayload),
       });
       const savedSettings = Object.fromEntries(
@@ -210,6 +288,7 @@ function AdminSettingsPage() {
       );
       const payload = await requestSettings("/api/admin/settings", token, {
         method: "PUT",
+        headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, [field.key]: value }),
       });
       setCredentials(payload.settings.secretsConfigured || {});
@@ -235,6 +314,7 @@ function AdminSettingsPage() {
       );
       const payload = await requestSettings("/api/admin/settings", token, {
         method: "PUT",
+        headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, resetCredentials: true }),
       });
       setCredentials(payload.settings.secretsConfigured || {});
@@ -247,6 +327,77 @@ function AdminSettingsPage() {
       setSaving(false);
     }
   };
+
+  if (!settingsAccessToken) {
+    return (
+      <div className="customer-page salon-landing admin-dashboard-page">
+        <AdminNavigation />
+        <Helmet>
+          <title>Verify settings access | MERZ Beauty Salon</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
+        <main className="customer-container admin-dashboard">
+          <section className="customer-panel admin-settings-access-panel">
+            <p className="customer-eyebrow">Salon control room</p>
+            <h1>Verify settings access</h1>
+            <p className="admin-settings-access-intro">
+              Enter the settings super PIN, then use the one-time code sent to
+              the admin email address.
+            </p>
+            {!challengeToken ? (
+              <form className="admin-settings-access-form" onSubmit={requestSettingsAccess}>
+                <label className="admin-settings-field">
+                  <span>Settings super PIN</span>
+                  <input
+                    type="password"
+                    value={superPin}
+                    autoComplete="off"
+                    onChange={(event) => setSuperPin(event.target.value)}
+                    required
+                  />
+                </label>
+                <button
+                  className="customer-button customer-button-primary"
+                  type="submit"
+                  disabled={accessLoading}
+                >
+                  {accessLoading ? "Checking…" : "Send verification code"}
+                </button>
+              </form>
+            ) : (
+              <form className="admin-settings-access-form" onSubmit={verifySettingsAccess}>
+                <label className="admin-settings-field">
+                  <span>One-time verification code</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={otp}
+                    autoComplete="one-time-code"
+                    onChange={(event) => setOtp(event.target.value)}
+                    required
+                  />
+                </label>
+                <button
+                  className="customer-button customer-button-primary"
+                  type="submit"
+                  disabled={accessLoading}
+                >
+                  {accessLoading ? "Verifying…" : "Open settings"}
+                </button>
+              </form>
+            )}
+            {accessError && (
+              <div className="customer-alert customer-alert-error" role="alert">
+                {accessError}
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="customer-page salon-landing admin-dashboard-page">
@@ -345,6 +496,7 @@ function AdminSettingsPage() {
                               {
                                 headers: {
                                   Accept: "application/json",
+                                  "X-Settings-Access-Token": settingsAccessToken,
                                   Authorization: `Bearer ${token}`,
                                 },
                               },
@@ -409,65 +561,81 @@ function AdminSettingsPage() {
             </button>
           </div>
           <div className="admin-settings-credentials" aria-label="Integration credential fields">
-            {secretFields.map((field) => (
-              <div className="admin-credential-item" key={field.key}>
-                <div className="admin-credential-summary">
-                  <div>
-                    <strong>{field.label}</strong>
-                    <span className={credentials[field.key] ? "is-configured" : ""}>
-                      {credentials[field.key] ? "Configured" : "Not configured"}
-                    </span>
-                  </div>
-                  <button
-                    className="admin-credential-edit"
-                    type="button"
-                    aria-expanded={editingCredential === field.key}
-                    aria-controls={`credential-editor-${field.key}`}
-                    disabled={saving}
-                    onClick={() =>
-                      setEditingCredential((current) =>
-                        current === field.key ? null : field.key,
-                      )
-                    }
-                  >
-                    {editingCredential === field.key ? "Close" : "Edit"}
-                  </button>
+            {credentialGroups.map((group) => (
+              <article className="admin-credential-group" key={group.key}>
+                <header className="admin-credential-group-header">
+                  <h3>{group.title}</h3>
+                  <p>{group.description}</p>
+                </header>
+                <div className="admin-credential-group-fields">
+                  {group.fields.map((field) => (
+                    <div className="admin-credential-item" key={field.key}>
+                      <div className="admin-credential-summary">
+                        <div>
+                          <strong>{field.label}</strong>
+                          <span
+                            className={
+                              credentials[field.key] ? "is-configured" : ""
+                            }
+                          >
+                            {credentials[field.key]
+                              ? "Configured"
+                              : "Not configured"}
+                          </span>
+                        </div>
+                        <button
+                          className="admin-credential-edit"
+                          type="button"
+                          aria-expanded={editingCredential === field.key}
+                          aria-controls={`credential-editor-${field.key}`}
+                          disabled={saving}
+                          onClick={() =>
+                            setEditingCredential((current) =>
+                              current === field.key ? null : field.key,
+                            )
+                          }
+                        >
+                          {editingCredential === field.key ? "Close" : "Edit"}
+                        </button>
+                      </div>
+                      {editingCredential === field.key && (
+                        <div
+                          className="admin-credential-editor"
+                          id={`credential-editor-${field.key}`}
+                        >
+                          <label className="admin-settings-field">
+                            <span>New value for {field.label}</span>
+                            <input
+                              type={field.type}
+                              value={credentialValues[field.key] || ""}
+                              placeholder={
+                                credentials[field.key]
+                                  ? "Enter a new value to replace the current one"
+                                  : "Enter a value"
+                              }
+                              autoComplete="new-password"
+                              onChange={(event) =>
+                                setCredentialValues((current) => ({
+                                  ...current,
+                                  [field.key]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <button
+                            className="customer-button customer-button-primary"
+                            type="button"
+                            disabled={saving || !credentialValues[field.key]}
+                            onClick={() => saveCredential(field)}
+                          >
+                            Save {field.label}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {editingCredential === field.key && (
-                  <div
-                    className="admin-credential-editor"
-                    id={`credential-editor-${field.key}`}
-                  >
-                    <label className="admin-settings-field">
-                      <span>New value for {field.label}</span>
-                      <input
-                        type={field.type}
-                        value={credentialValues[field.key] || ""}
-                        placeholder={
-                          credentials[field.key]
-                            ? "Enter a new value to replace the current one"
-                            : "Enter a value"
-                        }
-                        autoComplete="new-password"
-                        onChange={(event) =>
-                          setCredentialValues((current) => ({
-                            ...current,
-                            [field.key]: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <button
-                      className="customer-button customer-button-primary"
-                      type="button"
-                      disabled={saving || !credentialValues[field.key]}
-                      onClick={() => saveCredential(field)}
-                    >
-                      Save {field.label}
-                    </button>
-                  </div>
-                )}
-              </div>
+              </article>
             ))}
           </div>
         </section>

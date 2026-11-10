@@ -6,6 +6,7 @@ import {
   googleCalendarCallback,
 } from "../controllers/google-calendar.controller.js";
 import { protect, requireAdmin } from "../middlewares/auth.middleware.js";
+import { requireAdminSettingsAccess } from "../middlewares/admin-settings-access.middleware.js";
 
 const router = Router();
 
@@ -20,7 +21,11 @@ router.get("/connect", (req, res, next) => {
     return googleCalendarCallback(req, res);
   }
   return protect(req, res, () =>
-    requireAdmin(req, res, () => connectGoogleCalendar(req, res, next)),
+    requireAdmin(req, res, () =>
+      requireAdminSettingsAccess(req, res, () =>
+        connectGoogleCalendar(req, res, next),
+      ),
+    ),
   );
 });
 router.get("/callback", googleCalendarCallback);

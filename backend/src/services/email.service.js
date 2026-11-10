@@ -17,14 +17,21 @@ const getTransport = async () => {
   const host = secrets.smtpHost || process.env.SMTP_HOST;
   const user = secrets.smtpUser || process.env.SMTP_USER;
   const pass = secrets.smtpPass || process.env.SMTP_PASS;
+  const port = secrets.smtpPort || process.env.SMTP_PORT || 587;
+  const from =
+    secrets.smtpFrom ||
+    process.env.SMTP_FROM ||
+    secrets.smtpUser ||
+    process.env.SMTP_USER;
 
   if (!host || !user || !pass) return null;
 
   return {
     secrets,
+    from,
     transport: nodemailer.createTransport({
       host,
-      port: Number(secrets.smtpPort || process.env.SMTP_PORT || 587),
+      port: Number(port),
       secure: Boolean(process.env.SMTP_SECURE === "true"),
       auth: { user, pass },
     }),
@@ -78,10 +85,7 @@ export const sendAppointmentEmail = async ({
 
     await emailConfig.transport.sendMail({
       from:
-        emailConfig.secrets.smtpFrom ||
-        process.env.SMTP_FROM ||
-        emailConfig.secrets.smtpUser ||
-        process.env.SMTP_USER,
+        emailConfig.from,
       to: customer.email,
       subject: `MERZ Beauty Salon: ${title}`,
       text: `${title}\n\n${message}\n\n${details.join("\n")}`,
@@ -96,4 +100,20 @@ export const sendAppointmentEmail = async ({
     console.error("Failed to send appointment email:", error.message);
     return false;
   }
+};
+
+export const sendEmail = async ({ to, subject, text, html }) => {
+  const emailConfig = await getTransport();
+  if (!emailConfig) {
+    throw new Error("SMTP integration is not configured.");
+  }
+
+  await emailConfig.transport.sendMail({
+    from:
+      emailConfig.from,
+    to,
+    subject,
+    text,
+    html,
+  });
 };
