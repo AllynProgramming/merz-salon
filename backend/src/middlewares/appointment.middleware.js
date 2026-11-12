@@ -74,6 +74,7 @@ const createAppointmentSchema = z
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
     startTime: z.string().regex(timePattern, "Choose a valid time."),
+    staffId: z.string().regex(objectIdPattern, "Choose a valid staff member.").optional(),
   })
   .strict();
 
@@ -95,6 +96,7 @@ const createStaffAppointmentSchema = z
     serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
     date: z.string().refine(isValidDateOnly, "Select a valid date."),
     startTime: z.string().regex(timePattern, "Choose a valid time."),
+    staffId: z.string().regex(objectIdPattern, "Choose a valid staff member.").optional(),
   })
   .strict()
   .refine(

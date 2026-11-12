@@ -15,6 +15,7 @@ import {
 } from "../controllers/google-drive.controller.js";
 import { protect, requireAdmin } from "../middlewares/auth.middleware.js";
 import { requireAdminSettingsAccess } from "../middlewares/admin-settings-access.middleware.js";
+import { settingsSchema, validateBody } from "../middlewares/admin-settings.middleware.js";
 
 const router = Router();
 const accessLimiter = rateLimit({
@@ -32,6 +33,6 @@ router.post("/access/verify", accessLimiter, verifySettingsAccess);
 router.use(requireAdminSettingsAccess);
 router.get("/drive/connect", connectGoogleDrive);
 router.get("/", readIntegrationSettings);
-router.put("/", updateIntegrationSettings);
+router.put("/", validateBody(settingsSchema), updateIntegrationSettings);
 
 export default router;

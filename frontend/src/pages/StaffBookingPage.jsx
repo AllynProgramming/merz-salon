@@ -46,7 +46,7 @@ function formatTime(value) {
 }
 
 function StaffBookingPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -70,6 +70,7 @@ function StaffBookingPage() {
   const [calendarError, setCalendarError] = useState("");
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [startTime, setStartTime] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [creatingReminderTests, setCreatingReminderTests] = useState(false);
@@ -209,6 +210,7 @@ function StaffBookingPage() {
     setServiceId(value);
     setSlots([]);
     setStartTime("");
+    setSelectedStaffId("");
     setAvailabilityLoading(Boolean(value && date));
     setDateAvailability(null);
     setCalendarLoading(Boolean(value));
@@ -220,6 +222,7 @@ function StaffBookingPage() {
     setDate(value);
     setSlots([]);
     setStartTime("");
+    setSelectedStaffId("");
     setAvailabilityLoading(Boolean(value && serviceId));
     setError("");
   };
@@ -287,6 +290,9 @@ function StaffBookingPage() {
             serviceId,
             date,
             startTime,
+            ...(user?.role === "admin" && selectedStaffId
+              ? { staffId: selectedStaffId }
+              : {}),
           }
         : {
             customerId: customer._id,
@@ -763,6 +769,15 @@ function StaffBookingPage() {
                         disabled={!slot.available}
                         onChange={() => {
                           setStartTime(slot.startTime);
+                          setSelectedStaffId(
+                            (currentStaffId) =>
+                              slot.availableStaff?.some(
+                                (staff) =>
+                                  String(staff._id) === currentStaffId,
+                              )
+                                ? currentStaffId
+                                : String(slot.availableStaff?.[0]?._id || ""),
+                          );
                           setError("");
                         }}
                       />
@@ -773,6 +788,32 @@ function StaffBookingPage() {
                     </label>
                   ))}
                 </div>
+                {user?.role === "admin" &&
+                  slots.find((slot) => slot.startTime === startTime)
+                    ?.availableStaff?.length > 0 && (
+                    <label className="staff-booking__field staff-booking__staff-choice">
+                      <span>Assign this appointment to</span>
+                      <select
+                        value={selectedStaffId}
+                        onChange={(event) =>
+                          setSelectedStaffId(event.target.value)
+                        }
+                      >
+                        {slots
+                          .find((slot) => slot.startTime === startTime)
+                          .availableStaff.map((staff) => (
+                            <option key={staff._id} value={staff._id}>
+                              {staff.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  )}
+                {user?.role !== "admin" && walkInMode && startTime && (
+                  <p className="staff-booking__availability-note">
+                    This walk-in appointment will be assigned to you.
+                  </p>
+                )}
               </>
             ) : (
               <p className="staff-booking__no-slots">

@@ -65,6 +65,7 @@ function BookingPage() {
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [slot, setSlot] = useState(null);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState("");
   const [slotRetry, setSlotRetry] = useState(0);
@@ -180,6 +181,7 @@ function BookingPage() {
     setDate("");
     setSlots([]);
     setSlot(null);
+    setSelectedStaffId("");
     setSlotsError("");
   };
 
@@ -187,6 +189,7 @@ function BookingPage() {
     setDate(value);
     setSlots([]);
     setSlot(null);
+    setSelectedStaffId("");
     setSlotsLoading(true);
     setSlotsError("");
   };
@@ -233,6 +236,7 @@ function BookingPage() {
         serviceId,
         date,
         startTime: slot.startTime,
+        staffId: selectedStaffId || undefined,
         token,
       });
       const appointment = response.appointment || response;
@@ -396,11 +400,38 @@ function BookingPage() {
                   <TimeSlotGrid
                     slots={slots}
                     selectedTime={slot?.startTime}
-                    onSelect={setSlot}
+                    onSelect={(nextSlot) => {
+                      setSlot(nextSlot);
+                      setSelectedStaffId(
+                        (currentStaffId) =>
+                          nextSlot.availableStaff?.some(
+                            (staff) => String(staff._id) === currentStaffId,
+                          )
+                            ? currentStaffId
+                            : String(nextSlot.availableStaff?.[0]?._id || ""),
+                      );
+                    }}
                     loading={slotsLoading}
                     error={slotsError}
                     onRetry={refreshSlots}
                   />
+                  {slot?.available && slot.availableStaff?.length > 0 && (
+                    <label className="booking-staff-choice">
+                      <span>Preferred staff member</span>
+                      <select
+                        value={selectedStaffId}
+                        onChange={(event) =>
+                          setSelectedStaffId(event.target.value)
+                        }
+                      >
+                        {slot.availableStaff.map((staff) => (
+                          <option key={staff._id} value={staff._id}>
+                            {staff.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </>
               )}
               {step === 3 && (
@@ -415,6 +446,20 @@ function BookingPage() {
                     startTime={slot?.startTime}
                     endTime={slot?.endTime}
                   />
+                  {slot?.availableStaff?.find(
+                    (staff) => String(staff._id) === selectedStaffId,
+                  )?.name && (
+                    <p className="booking-review-note">
+                      Preferred staff member:{" "}
+                      <strong>
+                        {
+                          slot.availableStaff.find(
+                            (staff) => String(staff._id) === selectedStaffId,
+                          ).name
+                        }
+                      </strong>
+                    </p>
+                  )}
                   <p className="booking-review-note">
                     Your request stays pending while staff confirms it. If
                     you’re running late, contact the salon so they can help

@@ -23,7 +23,12 @@ const serviceInputSchema = z
   })
   .strict();
 
+const serviceParamsSchema = z.object({
+  id: z.string().regex(objectIdPattern, "Invalid service id."),
+});
+
 export { serviceQuerySchema };
 export { serviceInputSchema };
+export { serviceParamsSchema };
 
 export { validateBody, validateQuery, validateParams } from "./request-validation.middleware.js";

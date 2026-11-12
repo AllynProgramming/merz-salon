@@ -19,20 +19,64 @@ import {
   requireAdmin,
   requireStaffOrAdmin,
 } from "../middlewares/auth.middleware.js";
+import {
+  appointmentDetailSchema,
+  appointmentQuerySchema,
+  availabilityCalendarSchema,
+  availabilitySchema,
+  createStaffAppointmentSchema,
+  rescheduleSchema,
+  staffAssignmentSchema,
+  staffCustomerSearchSchema,
+  validateBody,
+  validateParams,
+  validateQuery,
+} from "../middlewares/appointment.middleware.js";
 
 const router = Router();
 
 router.use(protect, requireStaffOrAdmin, requirePasswordChangeComplete);
-router.get("/availability/calendar", getAvailabilityCalendar);
-router.get("/availability", getAvailability);
-router.get("/customers", searchBookingCustomers);
-router.get("/", listAppointments);
-router.post("/", createStaffAppointment);
+router.get(
+  "/availability/calendar",
+  validateQuery(availabilityCalendarSchema),
+  getAvailabilityCalendar,
+);
+router.get("/availability", validateQuery(availabilitySchema), getAvailability);
+router.get(
+  "/customers",
+  validateQuery(staffCustomerSearchSchema),
+  searchBookingCustomers,
+);
+router.get("/", validateQuery(appointmentQuerySchema), listAppointments);
+router.post(
+  "/",
+  validateBody(createStaffAppointmentSchema),
+  createStaffAppointment,
+);
 router.post("/test-reminders", createReminderTestAppointments);
-router.get("/:id", getStaffAppointment);
-router.patch("/:id/cancel", cancelStaffAppointment);
-router.patch("/:id/reschedule", rescheduleStaffAppointment);
-router.patch("/:id/assign", requireAdmin, assignAppointmentStaff);
-router.patch("/:id/confirm", confirmAppointment);
+router.get("/:id", validateParams(appointmentDetailSchema), getStaffAppointment);
+router.patch(
+  "/:id/cancel",
+  validateParams(appointmentDetailSchema),
+  cancelStaffAppointment,
+);
+router.patch(
+  "/:id/reschedule",
+  validateParams(appointmentDetailSchema),
+  validateBody(rescheduleSchema),
+  rescheduleStaffAppointment,
+);
+router.patch(
+  "/:id/assign",
+  requireAdmin,
+  validateParams(appointmentDetailSchema),
+  validateBody(staffAssignmentSchema),
+  assignAppointmentStaff,
+);
+router.patch(
+  "/:id/confirm",
+  validateParams(appointmentDetailSchema),
+  confirmAppointment,
+);
 
 export default router;

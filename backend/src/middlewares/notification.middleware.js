@@ -12,6 +12,11 @@ const paginationSchema = z
   })
   .strict();
 
+const notificationIdSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid notification id."),
+});
+
 export { paginationSchema };
+export { notificationIdSchema };
 
 export { validateBody, validateQuery, validateParams } from "./request-validation.middleware.js";

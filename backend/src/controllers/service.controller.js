@@ -1,19 +1,9 @@
-import mongoose from "mongoose";
-
 import Service from "../models/service.model.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const validateServiceId = (id, res) => {
-  if (!mongoose.isValidObjectId(id)) {
-    res.status(400).json({ message: "Invalid service id." });
-    return false;
-  }
-  return true;
-};
-
 export const getServices = async (req, res, next) => {
-  const { category, search, limit } = req.body;
+  const { category, search, limit } = req.query;
   const filter = { isActive: true };
 
   if (category) {
@@ -62,8 +52,6 @@ export const createService = async (req, res, next) => {
 };
 
 export const updateService = async (req, res, next) => {
-  if (!validateServiceId(req.params.id, res)) return;
-
   try {
     const service = await Service.findById(req.params.id);
     if (!service) {
@@ -79,8 +67,6 @@ export const updateService = async (req, res, next) => {
 };
 
 export const archiveService = async (req, res, next) => {
-  if (!validateServiceId(req.params.id, res)) return;
-
   try {
     const service = await Service.findOneAndUpdate(
       { _id: req.params.id, isActive: true },
@@ -98,8 +84,6 @@ export const archiveService = async (req, res, next) => {
 };
 
 export const restoreService = async (req, res, next) => {
-  if (!validateServiceId(req.params.id, res)) return;
-
   try {
     const service = await Service.findOneAndUpdate(
       { _id: req.params.id, isActive: false },
@@ -117,10 +101,6 @@ export const restoreService = async (req, res, next) => {
 };
 
 export const getServiceById = async (req, res, next) => {
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(400).json({ message: "Invalid service id." });
-  }
-
   try {
     const service = await Service.findOne({
       _id: req.params.id,

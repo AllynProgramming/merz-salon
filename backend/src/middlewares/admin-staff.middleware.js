@@ -56,8 +56,13 @@ const workingHoursSchema = z
     "Working hours must include each day of the week once.",
   );
 
+const staffParamsSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid staff member."),
+});
+
 export { createStaffSchema };
 export { updateStaffSchema };
 export { workingHoursSchema };
+export { staffParamsSchema };
 
 export { validateBody, validateQuery, validateParams } from "./request-validation.middleware.js";

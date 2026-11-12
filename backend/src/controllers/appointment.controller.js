@@ -307,8 +307,8 @@ const getCalculatedAvailabilityForService = async ({
     Appointment.find(appointmentQuery)
       .select("startTime endTime staff")
       .lean(),
-    User.find({ role: { $in: ["staff", "manager"] } })
-      .select("workingHours")
+    User.find({ role: { $in: ["staff", "manager", "admin"] } })
+      .select("name firstname lastname role workingHours")
       .sort({ _id: 1 })
       .lean(),
   ]);
@@ -328,11 +328,35 @@ const getCalculatedAvailabilityForService = async ({
 
 const getAvailabilityForService = async (options) => {
   const availability = await getCalculatedAvailabilityForService(options);
+  const staffById = new Map(
+    availability.calculatedSlots
+      .flatMap((slot) => slot.availableStaffIds)
+      .map((staffId) => [String(staffId), staffId]),
+  );
+  const staffMembers = await User.find({
+    _id: { $in: [...staffById.values()] },
+  })
+    .select("name firstname lastname role")
+    .lean();
+  const staffByIdWithDetails = new Map(
+    staffMembers.map((staff) => [
+      String(staff._id),
+      {
+        _id: staff._id,
+        name: getStaffDisplayName(staff),
+        role: staff.role,
+      },
+    ]),
+  );
+
   return {
     date: availability.date,
-    slots: availability.calculatedSlots.map(
-      ({ availableStaffIds, ...slot }) => slot,
-    ),
+    slots: availability.calculatedSlots.map(({ availableStaffIds, ...slot }) => ({
+      ...slot,
+      availableStaff: availableStaffIds
+        .map((staffId) => staffByIdWithDetails.get(String(staffId)))
+        .filter(Boolean),
+    })),
   };
 };
 
@@ -342,6 +366,7 @@ const ensureSlotIsAvailable = async ({
   startTime,
   excludeAppointmentId = "",
   preferredStaffId = "",
+  requirePreferredStaff = false,
 }) => {
   const availability = await getCalculatedAvailabilityForService({
     serviceId,
@@ -352,11 +377,17 @@ const ensureSlotIsAvailable = async ({
   const slot = availability.calculatedSlots.find(
     (entry) => entry.startTime === startTime,
   );
-  const availableStaffId = slot?.availableStaffIds.includes(
-    String(preferredStaffId || ""),
-  )
-    ? preferredStaffId
-    : slot?.availableStaffIds[0];
+  const preferredStaff = preferredStaffId
+    ? slot?.availableStaffIds.find(
+        (staffId) => String(staffId) === String(preferredStaffId),
+      )
+    : null;
+  if (preferredStaffId && !preferredStaff && requirePreferredStaff) {
+    throw Object.assign(new Error("That staff member is not available at this time."), {
+      status: 409,
+    });
+  }
+  const availableStaffId = preferredStaff || slot?.availableStaffIds[0];
   if (!slot?.available || !availableStaffId) {
     throw Object.assign(new Error("That time is no longer available."), {
       status: 409,
@@ -856,7 +887,7 @@ export const getAvailabilityCalendar = async (req, res, next) => {
 
 export const createStaffAppointment = async (req, res, next) => {
   try {
-    const { customerId, walkInCustomer, serviceId, date, startTime } =
+    const { customerId, walkInCustomer, serviceId, date, startTime, staffId } =
       req.body;
     const [customerRecord, service] = await Promise.all([
       customerId
@@ -942,7 +973,19 @@ export const createStaffAppointment = async (req, res, next) => {
     );
     const bookingReference = `MERZ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const appointment = await withBookingDateLock(date, async () => {
-      const slot = await ensureSlotIsAvailable({ serviceId, date, startTime });
+      const preferredStaffId =
+        req.user.role === "admin"
+          ? staffId
+          : walkInCustomer
+            ? req.user.id
+            : "";
+      const slot = await ensureSlotIsAvailable({
+        serviceId,
+        date,
+        startTime,
+        preferredStaffId,
+        requirePreferredStaff: Boolean(preferredStaffId),
+      });
       const newAppointment = new Appointment({
         ...(customer ? { customer: customer._id } : {}),
         ...(walkInCustomer
@@ -1137,7 +1180,7 @@ export const getStaffAppointment = async (req, res, next) => {
 
 export const createAppointment = async (req, res, next) => {
   try {
-    const { serviceId, date, startTime } = req.body;
+    const { serviceId, date, startTime, staffId } = req.body;
     const service = await Service.findOne({ _id: serviceId, isActive: true });
     if (!service) {
       return res.status(404).json({ message: "Choose an available service." });
@@ -1155,6 +1198,8 @@ export const createAppointment = async (req, res, next) => {
         serviceId,
         date,
         startTime,
+        preferredStaffId: staffId,
+        requirePreferredStaff: Boolean(staffId),
       });
       const newAppointment = new Appointment({
         customer: req.user.id,

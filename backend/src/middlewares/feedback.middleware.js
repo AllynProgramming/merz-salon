@@ -29,9 +29,14 @@ const feedbackUpdateSchema = z
     message: "Provide a rating or comment to update.",
   });
 
+const feedbackParamsSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid feedback or appointment id."),
+});
+
 export { ratingSchema };
 export { commentSchema };
 export { feedbackSchema };
 export { feedbackUpdateSchema };
+export { feedbackParamsSchema };
 
 export { validateBody, validateQuery, validateParams } from "./request-validation.middleware.js";
