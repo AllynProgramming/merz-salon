@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import AuthContext from "./auth-context.js";
 
 const TOKEN_KEY = "merz.auth.token";
+const SETTINGS_ACCESS_KEY = "merz.admin.settings.access";
+
+const clearSettingsAccess = () => {
+  localStorage.removeItem(SETTINGS_ACCESS_KEY);
+};
 
 async function authRequest(path, { token, ...options } = {}) {
   const response = await fetch(path, {
@@ -38,6 +43,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const expireSession = () => {
       localStorage.removeItem(TOKEN_KEY);
+      clearSettingsAccess();
       sessionStorage.removeItem("merz.booking.mock-appointments");
       setToken(null);
       setUser(null);
@@ -46,6 +52,7 @@ export function AuthProvider({ children }) {
     };
     const handleStorage = (event) => {
       if (event.key !== TOKEN_KEY) return;
+      clearSettingsAccess();
       if (!event.newValue) {
         sessionStorage.removeItem("merz.booking.mock-appointments");
       }
@@ -82,6 +89,7 @@ export function AuthProvider({ children }) {
       } catch (error) {
         if (error.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
+          clearSettingsAccess();
           if (active) {
             setToken(null);
             setUser(null);
@@ -100,6 +108,7 @@ export function AuthProvider({ children }) {
 
   const saveSession = (response) => {
     if (response.token) {
+      clearSettingsAccess();
       localStorage.setItem(TOKEN_KEY, response.token);
       setToken(response.token);
     }
@@ -126,6 +135,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithToken = useCallback(async (authToken) => {
+    clearSettingsAccess();
     localStorage.setItem(TOKEN_KEY, authToken);
     setToken(authToken);
     const response = await authRequest("/api/users/me", { token: authToken });
@@ -145,6 +155,7 @@ export function AuthProvider({ children }) {
       }
     } finally {
       localStorage.removeItem(TOKEN_KEY);
+      clearSettingsAccess();
       sessionStorage.removeItem("merz.booking.mock-appointments");
       setToken(null);
       setUser(null);

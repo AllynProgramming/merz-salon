@@ -4,15 +4,14 @@ import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
 const fail = (res, status, message) => res.status(status).json({ message });
 
 export const verifyRecaptcha = () => async (req, res, next) => {
-  let integrationSecrets;
+  let integrationSecrets = {};
   try {
     integrationSecrets = await getIntegrationSecrets(IntegrationSettings);
   } catch (error) {
     console.error(
-      "Could not load encrypted integration settings:",
+      "Could not load encrypted reCAPTCHA settings; using environment fallback:",
       error.message,
     );
-    return fail(res, 503, "Security settings are temporarily unavailable.");
   }
   const secret =
     integrationSecrets.recaptchaSecretKey || process.env.RECAPTCHA_SECRET_KEY;

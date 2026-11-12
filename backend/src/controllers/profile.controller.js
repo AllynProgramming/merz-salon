@@ -1,19 +1,6 @@
 import bcrypt from "bcryptjs";
-import { z } from "zod";
 
 import User from "../models/user.model.js";
-
-const profileUpdateSchema = z.object({
-  firstname: z.string().trim().min(2, "First name is required"),
-  lastname: z.string().trim().min(2, "Last name is required"),
-  phoneNumber: z.string().trim().min(7, "Phone number is required"),
-});
-
-const passwordChangeSchema = z.object({
-  currentPassword: z.string().min(6, "Current password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Please confirm your new password"),
-});
 
 const sanitizeUser = (user) => ({
   _id: user._id,
@@ -54,15 +41,7 @@ export const updateProfile = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const validation = profileUpdateSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({
-        message: validation.error.issues[0]?.message || "Invalid profile data",
-      });
-    }
-
-    const { firstname, lastname, phoneNumber } = validation.data;
+    const { firstname, lastname, phoneNumber } = req.body;
     const normalizedPhoneNumber = phoneNumber.trim();
 
     const user = await User.findById(req.user._id);
@@ -100,15 +79,7 @@ export const changePassword = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const validation = passwordChangeSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({
-        message: validation.error.issues[0]?.message || "Invalid password data",
-      });
-    }
-
-    const { currentPassword, newPassword, confirmPassword } = validation.data;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: "New passwords do not match" });

@@ -10,12 +10,17 @@ const initialSettings = {
   emailNotifications: true,
   appointmentReminders: true,
   googleCalendar: false,
+  googleDrive: false,
+  pdfReports: true,
   googleLogin: false,
   embeddedMaps: true,
   recaptchaRequired: false,
   calendarConnected: false,
   calendarEmail: "",
+  driveConnected: false,
+  driveEmail: "",
 };
+const SETTINGS_ACCESS_KEY = "merz.admin.settings.access";
 
 const integrationItems = [
   {
@@ -42,6 +47,18 @@ const integrationItems = [
     title: "Google Calendar",
     description: "Ready for calendar sync once the Calendar API is connected.",
     connected: false,
+  },
+  {
+    key: "googleDrive",
+    title: "Google Drive",
+    description: "Save generated salon reports as PDFs in Google Drive.",
+    connected: false,
+  },
+  {
+    key: "pdfReports",
+    title: "PDF report generator",
+    description: "Allow admins to download and save appointment reports as PDFs.",
+    connected: true,
   },
   {
     key: "embeddedMaps",
@@ -119,6 +136,15 @@ const credentialGroups = [
   },
 ];
 
+const isConnectionMetadata = (key) =>
+  [
+    "secretsConfigured",
+    "calendarConnected",
+    "calendarEmail",
+    "driveConnected",
+    "driveEmail",
+  ].includes(key);
+
 async function requestSettings(path, token, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -145,7 +171,19 @@ function AdminSettingsPage() {
   const [credentials, setCredentials] = useState({});
   const [credentialValues, setCredentialValues] = useState({});
   const [editingCredential, setEditingCredential] = useState(null);
-  const [settingsAccessToken, setSettingsAccessToken] = useState("");
+  const [settingsAccessToken, setSettingsAccessToken] = useState(() => {
+    const stored = localStorage.getItem(SETTINGS_ACCESS_KEY);
+    if (!stored) return "";
+    try {
+      const parsed = JSON.parse(stored);
+      return parsed.authToken === localStorage.getItem("merz.auth.token")
+        ? parsed.accessToken
+        : "";
+    } catch {
+      localStorage.removeItem(SETTINGS_ACCESS_KEY);
+      return "";
+    }
+  });
   const [superPin, setSuperPin] = useState("");
   const [challengeToken, setChallengeToken] = useState("");
   const [otp, setOtp] = useState("");
@@ -182,6 +220,13 @@ function AdminSettingsPage() {
         { method: "POST", body: JSON.stringify({ challengeToken, otp }) },
       );
       setSettingsAccessToken(payload.accessToken);
+      localStorage.setItem(
+        SETTINGS_ACCESS_KEY,
+        JSON.stringify({
+          authToken: token,
+          accessToken: payload.accessToken,
+        }),
+      );
       setOtp("");
     } catch (requestError) {
       setAccessError(requestError.message);
@@ -201,20 +246,17 @@ function AdminSettingsPage() {
       .then((payload) => {
         if (active) {
           const savedSettings = Object.fromEntries(
-            Object.entries(payload.settings).filter(
-              ([key]) =>
-                ![
-                  "secretsConfigured",
-                  "calendarConnected",
-                  "calendarEmail",
-                ].includes(key),
-            ),
+          Object.entries(payload.settings).filter(
+            ([key]) => !isConnectionMetadata(key),
+          ),
           );
           setSettings({
             ...initialSettings,
             ...savedSettings,
             calendarConnected: Boolean(payload.settings.calendarConnected),
             calendarEmail: payload.settings.calendarEmail || "",
+            driveConnected: Boolean(payload.settings.driveConnected),
+            driveEmail: payload.settings.driveEmail || "",
           });
           setCredentials(payload.settings.secretsConfigured || {});
         }
@@ -239,7 +281,7 @@ function AdminSettingsPage() {
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(nextSettings).filter(
-          ([field]) => !["calendarConnected", "calendarEmail"].includes(field),
+          ([field]) => !isConnectionMetadata(field),
         ),
       );
       const payload = await requestSettings("/api/admin/settings", token, {
@@ -249,12 +291,7 @@ function AdminSettingsPage() {
       });
       const savedSettings = Object.fromEntries(
         Object.entries(payload.settings).filter(
-          ([key]) =>
-            ![
-              "secretsConfigured",
-              "calendarConnected",
-              "calendarEmail",
-            ].includes(key),
+          ([key]) => !isConnectionMetadata(key),
         ),
       );
       setSettings({
@@ -262,6 +299,8 @@ function AdminSettingsPage() {
         ...savedSettings,
         calendarConnected: Boolean(payload.settings.calendarConnected),
         calendarEmail: payload.settings.calendarEmail || "",
+        driveConnected: Boolean(payload.settings.driveConnected),
+        driveEmail: payload.settings.driveEmail || "",
       });
       setCredentials(payload.settings.secretsConfigured || {});
       setNotice("Settings saved.");
@@ -283,7 +322,7 @@ function AdminSettingsPage() {
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(settings).filter(
-          ([key]) => !["calendarConnected", "calendarEmail"].includes(key),
+          ([key]) => !isConnectionMetadata(key),
         ),
       );
       const payload = await requestSettings("/api/admin/settings", token, {
@@ -309,7 +348,7 @@ function AdminSettingsPage() {
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(settings).filter(
-          ([key]) => !["calendarConnected", "calendarEmail"].includes(key),
+          ([key]) => !isConnectionMetadata(key),
         ),
       );
       const payload = await requestSettings("/api/admin/settings", token, {
@@ -454,7 +493,8 @@ function AdminSettingsPage() {
                   <div>
                     <h3>{item.title}</h3>
                     <p>{item.description}</p>
-                    {!item.connected && item.key !== "googleCalendar" && (
+                    {!item.connected &&
+                      !["googleCalendar", "googleDrive"].includes(item.key) && (
                       <span className="admin-settings-status">
                         Not connected
                       </span>
@@ -468,20 +508,26 @@ function AdminSettingsPage() {
                             : ""}
                         </span>
                       )}
+                    {item.key === "googleDrive" && settings.driveConnected && (
+                      <span className="admin-settings-status">
+                        Connected
+                        {settings.driveEmail ? ` as ${settings.driveEmail}` : ""}
+                      </span>
+                    )}
                   </div>
-                  {item.key === "googleCalendar" ? (
+                  {item.key === "googleCalendar" || item.key === "googleDrive" ? (
                     <div className="admin-settings-actions">
                       <button
-                        className={`admin-settings-toggle${settings.googleCalendar ? " is-on" : ""}`}
+                        className={`admin-settings-toggle${settings[item.key] ? " is-on" : ""}`}
                         type="button"
                         role="switch"
-                        aria-checked={settings.googleCalendar}
-                        aria-label={`${settings.googleCalendar ? "Disable" : "Enable"} Google Calendar`}
+                        aria-checked={settings[item.key]}
+                        aria-label={`${settings[item.key] ? "Disable" : "Enable"} ${item.title}`}
                         disabled={saving}
-                        onClick={() => updateSetting("googleCalendar")}
+                        onClick={() => updateSetting(item.key)}
                       >
                         <span />
-                        {settings.googleCalendar ? "On" : "Off"}
+                        {settings[item.key] ? "On" : "Off"}
                       </button>
                       <button
                         className="customer-button customer-button-outline"
@@ -492,7 +538,9 @@ function AdminSettingsPage() {
                           setNotice("");
                           try {
                             const response = await fetch(
-                              "/api/admin/calendar/connect",
+                              item.key === "googleCalendar"
+                                ? "/api/admin/calendar/connect"
+                                : "/api/admin/settings/drive/connect",
                               {
                                 headers: {
                                   Accept: "application/json",
@@ -507,7 +555,7 @@ function AdminSettingsPage() {
                             if (!response.ok) {
                               throw new Error(
                                 payload.message ||
-                                  "Could not connect Google Calendar.",
+                                  `Could not connect ${item.title}.`,
                               );
                             }
                             window.location.href = payload.authorizationUrl;
@@ -516,7 +564,11 @@ function AdminSettingsPage() {
                           }
                         }}
                       >
-                        {settings.calendarConnected ? "Reconnect" : "Connect"}
+                        {(item.key === "googleCalendar"
+                          ? settings.calendarConnected
+                          : settings.driveConnected)
+                          ? "Reconnect"
+                          : "Connect"}
                       </button>
                     </div>
                   ) : (

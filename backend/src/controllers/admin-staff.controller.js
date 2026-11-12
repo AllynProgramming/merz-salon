@@ -1,77 +1,14 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { z } from "zod";
 import Appointment from "../models/appointment.model.js";
 import User from "../models/user.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
 
-const createStaffSchema = z
-  .object({
-    name: z.string().trim().min(2).max(120),
-    email: z.string().trim().email().max(254),
-    phone: z.string().trim().min(7).max(30),
-    role: z.enum(["staff", "manager", "admin"]).default("staff"),
-  })
-  .strict();
-
-const updateStaffSchema = z
-  .object({
-    name: z.string().trim().min(2).max(120).optional(),
-    email: z.string().trim().email().max(254).optional(),
-    phone: z.string().trim().min(7).max(30).optional(),
-    role: z.enum(["staff", "manager", "admin"]).optional(),
-    resetPassword: z.boolean().optional().default(false),
-  })
-  .strict()
-  .refine(
-    (data) =>
-      data.name !== undefined ||
-      data.email !== undefined ||
-      data.phone !== undefined ||
-      data.role !== undefined ||
-      data.resetPassword,
-    "Provide a name, phone number, or password reset.",
-  );
-
-const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
-const workingHoursSchema = z
-  .object({
-    workingHours: z
-      .array(
-        z
-          .object({
-            weekday: z.number().int().min(0).max(6),
-            enabled: z.boolean(),
-            startTime: z.string().regex(timePattern),
-            endTime: z.string().regex(timePattern),
-          })
-          .strict()
-          .refine(
-            (hours) => !hours.enabled || hours.startTime < hours.endTime,
-            "Closing time must be after opening time.",
-          ),
-      )
-      .length(7),
-  })
-  .strict()
-  .refine(
-    ({ workingHours }) =>
-      new Set(workingHours.map(({ weekday }) => weekday)).size === 7,
-    "Working hours must include each day of the week once.",
-  );
-
 const staffIdPattern = /^[a-f\d]{24}$/i;
 
 export const createStaff = async (req, res, next) => {
-  const validation = createStaffSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message: validation.error.issues[0]?.message || "Invalid staff account.",
-    });
-  }
-
-  const { name, phone, role } = validation.data;
-  const email = validation.data.email.toLowerCase();
+  const { name, phone, role } = req.body;
+  const email = req.body.email.toLowerCase();
   const [firstname, ...lastname] = name.split(/\s+/);
   const temporaryPassword = `Merz-${crypto.randomBytes(6).toString("base64url")}`;
 
@@ -150,15 +87,8 @@ export const updateStaff = async (req, res, next) => {
     return res.status(400).json({ message: "Invalid staff member." });
   }
 
-  const validation = updateStaffSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message: validation.error.issues[0]?.message || "Invalid staff update.",
-    });
-  }
-
   const { name, email: submittedEmail, phone, role, resetPassword } =
-    validation.data;
+    req.body;
   const email = submittedEmail?.toLowerCase();
   const temporaryPassword = resetPassword
     ? `Merz-${crypto.randomBytes(6).toString("base64url")}`
@@ -251,14 +181,6 @@ export const updateStaffWorkingHours = async (req, res, next) => {
     return res.status(400).json({ message: "Invalid staff member." });
   }
 
-  const validation = workingHoursSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid working hours.",
-    });
-  }
-
   try {
     const now = new Date();
     const today = new Date(
@@ -278,7 +200,7 @@ export const updateStaffWorkingHours = async (req, res, next) => {
       .select("date startTime endTime")
       .lean();
     const proposedHours = new Map(
-      validation.data.workingHours.map((hours) => [hours.weekday, hours]),
+      req.body.workingHours.map((hours) => [hours.weekday, hours]),
     );
     const conflict = assignedAppointments.find((appointment) => {
       const weekday = new Date(appointment.date).getUTCDay();
@@ -298,7 +220,7 @@ export const updateStaffWorkingHours = async (req, res, next) => {
 
     const staff = await User.findOneAndUpdate(
       { _id: req.params.id, role: { $in: ["staff", "manager", "admin"] } },
-      { $set: { workingHours: validation.data.workingHours } },
+      { $set: { workingHours: req.body.workingHours } },
       { new: true, runValidators: true },
     )
       .select("name firstname lastname email workingHours")

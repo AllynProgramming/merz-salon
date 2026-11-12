@@ -1,37 +1,9 @@
-import { z } from "zod";
 
 import Feedback from "../models/feedback.model.js";
 import Appointment from "../models/appointment.model.js";
 import Service from "../models/service.model.js";
 import { APPOINTMENT_STATUS } from "../constants/appointmentStatus.js";
 import { createAppointmentNotifications } from "../services/notification.service.js";
-
-const ratingSchema = z.coerce
-  .number()
-  .int()
-  .min(1, "Please choose a rating from 1 to 5")
-  .max(5, "Please choose a rating from 1 to 5");
-const commentSchema = z.string().trim().max(1000, "Comment is too long");
-
-const feedbackSchema = z
-  .object({
-    appointmentId: z
-      .string()
-      .regex(/^[a-f\d]{24}$/i, "Appointment is required"),
-    rating: ratingSchema,
-    comment: commentSchema.optional().default(""),
-  })
-  .strict();
-
-const feedbackUpdateSchema = z
-  .object({
-    rating: ratingSchema.optional(),
-    comment: commentSchema.optional(),
-  })
-  .strict()
-  .refine((data) => data.rating !== undefined || data.comment !== undefined, {
-    message: "Provide a rating or comment to update.",
-  });
 
 const sanitizeComment = (value = "") => {
   return String(value)
@@ -72,16 +44,8 @@ const refreshServiceRating = async (serviceId) => {
 };
 
 export const createFeedback = async (req, res, next) => {
-  const validation = feedbackSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid feedback details.",
-    });
-  }
-
   try {
-    const { appointmentId, rating, comment } = validation.data;
+    const { appointmentId, rating, comment } = req.body;
     const appointment = await Appointment.findOne({
       _id: appointmentId,
       customer: req.user.id,
@@ -225,14 +189,6 @@ export const updateFeedback = async (req, res, next) => {
     return res.status(400).json({ message: "Invalid feedback id." });
   }
   const feedbackId = req.params.id;
-  const validation = feedbackUpdateSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid feedback update.",
-    });
-  }
-
   try {
     const feedback = await Feedback.findOne({
       _id: feedbackId,
@@ -251,9 +207,9 @@ export const updateFeedback = async (req, res, next) => {
         .json({ message: "This feedback can no longer be edited." });
     }
 
-    if (validation.data.rating) feedback.rating = validation.data.rating;
-    if (validation.data.comment !== undefined) {
-      feedback.comment = sanitizeComment(validation.data.comment);
+    if (req.body.rating) feedback.rating = req.body.rating;
+    if (req.body.comment !== undefined) {
+      feedback.comment = sanitizeComment(req.body.comment);
     }
 
     await feedback.save();

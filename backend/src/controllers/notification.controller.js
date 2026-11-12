@@ -1,4 +1,3 @@
-import { z } from "zod";
 
 import {
   deleteNotification,
@@ -8,27 +7,9 @@ import {
   markNotificationRead,
 } from "../services/notification.service.js";
 
-const paginationSchema = z
-  .object({
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(50).default(10),
-    unreadOnly: z
-      .preprocess((value) => value === "true" || value === true, z.boolean())
-      .optional(),
-  })
-  .strict();
-
 export const getNotifications = async (req, res, next) => {
-  const validation = paginationSchema.safeParse(req.query);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid notification filters.",
-    });
-  }
-
   try {
-    const { page, limit, unreadOnly } = validation.data;
+    const { page, limit, unreadOnly } = req.query;
     const data = await getNotificationsForUser({
       userId: req.user.id,
       unreadOnly: Boolean(unreadOnly),

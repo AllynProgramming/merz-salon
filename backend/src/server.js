@@ -19,6 +19,7 @@ import adminSettingsRoutes from "./routes/admin-settings.routes.js";
 import adminReportsRoutes from "./routes/admin-reports.routes.js";
 import publicSettingsRoutes from "./routes/public-settings.routes.js";
 import adminCalendarRoutes from "./routes/admin-calendar.routes.js";
+import { googleDriveCallback } from "./controllers/google-drive.controller.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
 
 config();
@@ -78,6 +79,7 @@ app.use("/api/staff/appointments", staffAppointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/admin/calendar", adminCalendarRoutes);
+app.get("/api/admin/settings/drive/callback", googleDriveCallback);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin/reports", adminReportsRoutes);

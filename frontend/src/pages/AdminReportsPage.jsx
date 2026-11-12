@@ -32,6 +32,93 @@ function AdminReportsPage() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [driveConnected, setDriveConnected] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMessage, setDriveMessage] = useState("");
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+
+  const reportQuery = () => new URLSearchParams({ from, to }).toString();
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/admin/reports/drive/status", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => response.json())
+      .then((payload) => setDriveConnected(Boolean(payload.connected)))
+      .catch(() => setDriveConnected(false));
+  }, [token]);
+
+  const previewPdf = async () => {
+    setDriveBusy(true);
+    setDriveMessage("");
+    try {
+      const response = await fetch(`/api/admin/reports/pdf?${reportQuery()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Could not create the PDF report.");
+      const blob = await response.blob();
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+      setPdfPreviewUrl(URL.createObjectURL(blob));
+      setPdfPreviewOpen(true);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  const closePdfPreview = () => {
+    setPdfPreviewOpen(false);
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl);
+      setPdfPreviewUrl("");
+    }
+  };
+
+  const downloadPdf = () => {
+    if (!pdfPreviewUrl) return;
+    const link = document.createElement("a");
+    link.href = pdfPreviewUrl;
+    link.download = `merz-report-${from}-to-${to}.pdf`;
+    link.click();
+    setDriveMessage("PDF downloaded.");
+  };
+
+  const connectDrive = async () => {
+    try {
+      const response = await fetch("/api/admin/reports/drive/connect", {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Could not connect Google Drive.");
+      window.location.assign(payload.authorizationUrl);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const uploadToDrive = async () => {
+    setDriveBusy(true);
+    setDriveMessage("");
+    try {
+      const response = await fetch(`/api/admin/reports/drive/upload?${reportQuery()}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Could not save the report to Google Drive.");
+      setDriveMessage("Saved to Google Drive.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setDriveBusy(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -112,11 +199,80 @@ function AdminReportsPage() {
               Showing {report.period.from} to {report.period.to}
             </p>
           )}
+          {report?.pdfReportsEnabled !== false && (
+            <div className="admin-reports__actions">
+              <button
+                className="customer-button customer-button-outline"
+                type="button"
+                onClick={previewPdf}
+                disabled={driveBusy || loading}
+              >
+                {driveBusy ? "Preparing preview..." : "Preview PDF"}
+              </button>
+              {driveConnected ? (
+                <button
+                  className="customer-button"
+                  type="button"
+                  onClick={uploadToDrive}
+                  disabled={driveBusy || loading}
+                >
+                  {driveBusy ? "Saving..." : "Save to Google Drive"}
+                </button>
+              ) : (
+                <button className="customer-button" type="button" onClick={connectDrive}>
+                  Connect Google Drive
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
+        {driveMessage && <p className="admin-reports__feedback" role="status">{driveMessage}</p>}
         {error && (
           <div className="customer-alert customer-alert-error" role="alert">
             {error}
+          </div>
+        )}
+        {pdfPreviewOpen && pdfPreviewUrl && (
+          <div className="admin-reports__preview-backdrop" role="presentation">
+            <section
+              className="admin-reports__preview"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pdf-preview-title"
+            >
+              <header className="admin-reports__preview-header">
+                <div>
+                  <p className="customer-eyebrow">Report preview</p>
+                  <h2 id="pdf-preview-title">Operations report</h2>
+                </div>
+                <button
+                  className="admin-reports__preview-close"
+                  type="button"
+                  onClick={closePdfPreview}
+                  aria-label="Close PDF preview"
+                >
+                  Close
+                </button>
+              </header>
+              <iframe
+                className="admin-reports__preview-frame"
+                src={pdfPreviewUrl}
+                title="PDF report preview"
+              />
+              <footer className="admin-reports__preview-actions">
+                <button
+                  className="customer-button customer-button-outline"
+                  type="button"
+                  onClick={closePdfPreview}
+                >
+                  Keep editing
+                </button>
+                <button className="customer-button" type="button" onClick={downloadPdf}>
+                  Download PDF
+                </button>
+              </footer>
+            </section>
           </div>
         )}
         {loading ? (

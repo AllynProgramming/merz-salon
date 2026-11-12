@@ -183,7 +183,6 @@ function AdminSchedulePage() {
   const [googleCalendarLoading, setGoogleCalendarLoading] = useState(true);
   const [googleCalendarError, setGoogleCalendarError] = useState("");
   const [googleCalendarEnabled, setGoogleCalendarEnabled] = useState(false);
-  const [calendarEmbedUrl, setCalendarEmbedUrl] = useState("");
   const calendarDays = getCalendarDays(viewMonth);
   const weekDays = getWeekDays(dateFromKey(selectedDate));
   const rangeStart =
@@ -226,16 +225,9 @@ function AdminSchedulePage() {
         if (active) {
           const enabled = payload?.googleCalendar === true;
           setGoogleCalendarEnabled(enabled);
-          setCalendarEmbedUrl(
-            enabled && payload?.calendarEmbedConfigured
-              ? payload.calendarEmbedUrl || ""
-              : "",
-          );
         }
       })
-      .catch(() => {
-        if (active) setCalendarEmbedUrl("");
-      });
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -685,7 +677,9 @@ function AdminSchedulePage() {
         )}
 
         {googleCalendarEnabled &&
-          (calendarEmbedUrl || googleCalendar.connected) && (
+          (googleCalendarLoading ||
+            googleCalendarError ||
+            googleCalendar.connected) && (
             <section
               className="customer-panel admin-schedule__google-calendar"
               aria-labelledby="google-calendar-heading"
@@ -697,15 +691,7 @@ function AdminSchedulePage() {
                   <p>Private events from the connected Google Calendar.</p>
                 </div>
               </div>
-              {calendarEmbedUrl ? (
-                <div className="admin-schedule__google-calendar-frame">
-                  <iframe
-                    title="Google Calendar for the salon"
-                    src={calendarEmbedUrl}
-                    loading="lazy"
-                  />
-                </div>
-              ) : googleCalendarLoading ? (
+              {googleCalendarLoading ? (
                 <p
                   className="admin-schedule__google-calendar-status"
                   role="status"
@@ -860,6 +846,7 @@ function AdminSchedulePage() {
                 {weekDays.map((date) => {
                   const key = dateKey(date);
                   const dayAppointments = appointmentsByDate.get(key) || [];
+                  const dayGoogleEvents = googleEventsByDate.get(key) || [];
                   const isToday = key === dateKey(new Date());
 
                   return (
@@ -883,15 +870,15 @@ function AdminSchedulePage() {
                           </span>
                         </div>
                         <span>
-                          {dayAppointments.length}{" "}
-                          {dayAppointments.length === 1
+                          {dayAppointments.length + dayGoogleEvents.length}{" "}
+                          {dayAppointments.length + dayGoogleEvents.length === 1
                             ? "appointment"
                             : "appointments"}
                         </span>
                       </header>
-                      {dayAppointments.length === 0 ? (
+                      {dayAppointments.length === 0 && dayGoogleEvents.length === 0 ? (
                         <p className="admin-schedule__week-empty">
-                          No appointments
+                          No calendar items
                         </p>
                       ) : (
                         <div className="admin-schedule__list">
@@ -1025,6 +1012,31 @@ function AdminSchedulePage() {
                               )}
                             </article>
                           ))}
+                          {dayGoogleEvents.map((event) => {
+                            const start =
+                              event.start?.dateTime || event.start?.date;
+                            return (
+                              <article
+                                key={`google-${event.id}`}
+                                className="admin-schedule__appointment admin-schedule__google-calendar-event"
+                              >
+                                <div className="admin-schedule__appointment-time">
+                                  <strong>
+                                    {event.start?.dateTime
+                                      ? new Intl.DateTimeFormat(undefined, {
+                                          hour: "numeric",
+                                          minute: "2-digit",
+                                        }).format(new Date(start))
+                                      : "All day"}
+                                  </strong>
+                                </div>
+                                <div className="admin-schedule__appointment-details">
+                                  <strong>{event.summary || "Google Calendar event"}</strong>
+                                  <span>Google Calendar</span>
+                                </div>
+                              </article>
+                            );
+                          })}
                         </div>
                       )}
                     </section>

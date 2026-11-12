@@ -13,7 +13,15 @@ const escapeHtml = (value) =>
     .replaceAll("'", "&#039;");
 
 const getTransport = async () => {
-  const secrets = await getIntegrationSecrets(IntegrationSettings);
+  let secrets = {};
+  try {
+    secrets = await getIntegrationSecrets(IntegrationSettings);
+  } catch (error) {
+    console.error(
+      "Could not load encrypted SMTP settings; using environment fallback:",
+      error.message,
+    );
+  }
   const host = secrets.smtpHost || process.env.SMTP_HOST;
   const user = secrets.smtpUser || process.env.SMTP_USER;
   const pass = secrets.smtpPass || process.env.SMTP_PASS;

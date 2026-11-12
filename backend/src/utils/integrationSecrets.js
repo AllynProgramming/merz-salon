@@ -45,19 +45,30 @@ export const decryptSecret = (value) => {
 export const getIntegrationSecrets = async (IntegrationSettings) => {
   const settings = await IntegrationSettings.findOne({ key: "default" }).lean();
   if (!settings) return {};
-  return Object.fromEntries(
-    [
-      "googleClientId",
-      "googleClientSecret",
-      "googleOauthRedirectUri",
-      "googleCalendarRedirectUri",
-      "calendarRefreshToken",
-      "smtpHost",
-      "smtpPort",
-      "smtpUser",
-      "smtpPass",
-      "smtpFrom",
-      "recaptchaSecretKey",
-    ].map((field) => [field, decryptSecret(settings[field])]),
-  );
+  const fields = [
+    "googleClientId",
+    "googleClientSecret",
+    "googleOauthRedirectUri",
+    "googleCalendarRedirectUri",
+    "calendarRefreshToken",
+    "driveRefreshToken",
+    "smtpHost",
+    "smtpPort",
+    "smtpUser",
+    "smtpPass",
+    "smtpFrom",
+    "recaptchaSecretKey",
+  ];
+  const secrets = {};
+
+  for (const field of fields) {
+    try {
+      secrets[field] = decryptSecret(settings[field]);
+    } catch (error) {
+      console.error(`Could not decrypt integration setting ${field}:`, error.message);
+      secrets[field] = "";
+    }
+  }
+
+  return secrets;
 };

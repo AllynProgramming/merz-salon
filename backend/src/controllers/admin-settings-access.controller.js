@@ -1,17 +1,7 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import { z } from "zod";
 
 import { sendEmail } from "../services/email.service.js";
-
-const requestSchema = z.object({
-  superPin: z.string().trim().min(1).max(128),
-});
-
-const verifySchema = z.object({
-  challengeToken: z.string().min(1),
-  otp: z.string().regex(/^\d{6}$/, "Enter the 6-digit code."),
-});
 
 const hashOtp = (otp) =>
   crypto.createHash("sha256").update(otp).digest("hex");
@@ -26,22 +16,17 @@ const getSettingsAccessToken = (userId) =>
   jwt.sign(
     { type: "admin-settings-access", userId: String(userId) },
     process.env.JWT_SECRET,
-    { expiresIn: "10m" },
+    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
   );
 
 export const requestSettingsAccess = async (req, res) => {
-  const validation = requestSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({ message: "Enter the settings super PIN." });
-  }
-
   if (!process.env.ADMIN_SUPER_PIN) {
     return res.status(503).json({
       message: "Settings security is not configured on the server.",
     });
   }
 
-  if (!secretsMatch(validation.data.superPin, process.env.ADMIN_SUPER_PIN)) {
+  if (!secretsMatch(req.body.superPin, process.env.ADMIN_SUPER_PIN)) {
     return res.status(401).json({ message: "The settings super PIN is incorrect." });
   }
 
@@ -84,17 +69,12 @@ export const requestSettingsAccess = async (req, res) => {
 };
 
 export const verifySettingsAccess = async (req, res) => {
-  const validation = verifySchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({ message: "Enter the 6-digit verification code." });
-  }
-
   try {
     const challenge = jwt.verify(
-      validation.data.challengeToken,
+      req.body.challengeToken,
       process.env.JWT_SECRET,
     );
-    const submittedHash = hashOtp(validation.data.otp);
+    const submittedHash = hashOtp(req.body.otp);
     const expectedHash = Buffer.from(challenge.otpHash || "");
     const actualHash = Buffer.from(submittedHash);
     if (

@@ -1,6 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { z } from "zod";
 
 import Appointment from "../models/appointment.model.js";
 import Feedback from "../models/feedback.model.js";
@@ -43,116 +42,6 @@ const notifyStaffOfAssignment = async (details) => {
     console.error("Failed to create staff assignment notification:", error);
   }
 };
-
-const appointmentQuerySchema = z
-  .object({
-    type: z.enum(["upcoming", "past", "all"]).optional(),
-    status: z.enum(appointmentStatuses).optional(),
-    from: z
-      .string()
-      .refine(isValidDateOnly, "Use a valid date in YYYY-MM-DD format")
-      .optional(),
-    to: z
-      .string()
-      .refine(isValidDateOnly, "Use a valid date in YYYY-MM-DD format")
-      .optional(),
-    search: z.string().trim().max(120).optional(),
-    sort: z.enum(["date_asc", "date_desc"]).optional(),
-    page: z.coerce.number().int().min(1).optional(),
-    limit: z.coerce.number().int().min(1).max(50).optional(),
-  })
-  .strict()
-  .refine(
-    (filters) => !filters.from || !filters.to || filters.from <= filters.to,
-    {
-      message: "The end date must be on or after the start date.",
-      path: ["to"],
-    },
-  );
-
-const appointmentDetailSchema = z
-  .object({
-    id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid appointment id."),
-  })
-  .strict();
-const staffAssignmentSchema = z
-  .object({
-    staffId: z
-      .string()
-      .regex(/^[a-f\d]{24}$/i, "Choose a valid staff member.")
-      .nullable(),
-  })
-  .strict();
-
-const availabilitySchema = z
-  .object({
-    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
-    date: z.string().refine(isValidDateOnly, "Select a valid date."),
-    excludeAppointmentId: z.string().regex(objectIdPattern).optional(),
-  })
-  .strict();
-
-const availabilityCalendarSchema = z
-  .object({
-    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
-    from: z.string().refine(isValidDateOnly, "Select a valid start date."),
-    to: z.string().refine(isValidDateOnly, "Select a valid end date."),
-  })
-  .strict()
-  .refine((range) => range.from <= range.to, {
-    message: "The end date must be on or after the start date.",
-    path: ["to"],
-  });
-
-const createAppointmentSchema = z
-  .object({
-    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
-    date: z.string().refine(isValidDateOnly, "Select a valid date."),
-    startTime: z.string().regex(timePattern, "Choose a valid time."),
-  })
-  .strict();
-
-const walkInCustomerSchema = z
-  .object({
-    name: z.string().trim().min(2).max(120),
-    phone: z.string().trim().min(7).max(30),
-    email: z.string().trim().email().max(254).optional().or(z.literal("")),
-  })
-  .strict();
-
-const createStaffAppointmentSchema = z
-  .object({
-    customerId: z
-      .string()
-      .regex(objectIdPattern, "Choose a valid customer.")
-      .optional(),
-    walkInCustomer: walkInCustomerSchema.optional(),
-    serviceId: z.string().regex(objectIdPattern, "Choose a valid service."),
-    date: z.string().refine(isValidDateOnly, "Select a valid date."),
-    startTime: z.string().regex(timePattern, "Choose a valid time."),
-  })
-  .strict()
-  .refine(
-    ({ customerId, walkInCustomer }) =>
-      Boolean(customerId) !== Boolean(walkInCustomer),
-    {
-      message: "Choose a customer or enter walk-in customer details.",
-      path: ["customerId"],
-    },
-  );
-
-const staffCustomerSearchSchema = z
-  .object({
-    search: z.string().trim().min(2).max(80),
-  })
-  .strict();
-
-const rescheduleSchema = z
-  .object({
-    date: z.string().refine(isValidDateOnly, "Select a valid date."),
-    startTime: z.string().regex(timePattern, "Choose a valid time."),
-  })
-  .strict();
 
 const parseDate = (value) =>
   value ? new Date(`${value}T00:00:00.000Z`) : null;
@@ -213,15 +102,8 @@ const expirePendingAppointment = async (appointment, appointmentDate) => {
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const searchBookingCustomers = async (req, res, next) => {
-  const validation = staffCustomerSearchSchema.safeParse(req.query);
-  if (!validation.success) {
-    return res.status(400).json({
-      message: "Enter at least 2 characters to search customers.",
-    });
-  }
-
   try {
-    const pattern = new RegExp(escapeRegex(validation.data.search), "i");
+    const pattern = new RegExp(escapeRegex(req.query.search), "i");
     const customers = await User.find({
       role: "customer",
       $or: [
@@ -485,14 +367,6 @@ const ensureSlotIsAvailable = async ({
 };
 
 export const listAppointments = async (req, res, next) => {
-  const validation = appointmentQuerySchema.safeParse(req.query);
-  if (!validation.success) {
-    const issue = validation.error.issues[0];
-    return res.status(400).json({
-      message: issue?.message || "Invalid appointment filter values.",
-    });
-  }
-
   try {
     const {
       type = "all",
@@ -503,7 +377,7 @@ export const listAppointments = async (req, res, next) => {
       sort,
       page = 1,
       limit = 10,
-    } = validation.data;
+    } = req.query;
     const isStaffView = ["staff", "manager", "admin"].includes(req.user.role);
     const filters = isStaffView ? [] : [{ customer: req.user.id }];
 
@@ -687,15 +561,6 @@ export const listAppointments = async (req, res, next) => {
 };
 
 export const assignAppointmentStaff = async (req, res, next) => {
-  const idValidation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  const bodyValidation = staffAssignmentSchema.safeParse(req.body);
-  if (!idValidation.success || !bodyValidation.success) {
-    return res.status(400).json({
-      message:
-        bodyValidation.error?.issues[0]?.message || "Invalid staff assignment.",
-    });
-  }
-
   try {
     const appointment = await Appointment.findById(req.params.id).populate(
       "service",
@@ -714,7 +579,7 @@ export const assignAppointmentStaff = async (req, res, next) => {
       });
     }
 
-    const { staffId } = bodyValidation.data;
+    const { staffId } = req.body;
     const previousStaffId = appointment.staff ? String(appointment.staff) : "";
     if (!staffId) {
       appointment.staff = null;
@@ -728,7 +593,7 @@ export const assignAppointmentStaff = async (req, res, next) => {
 
     const staff = await User.findOne({
       _id: staffId,
-      role: { $in: ["staff", "manager"] },
+      role: { $in: ["staff", "manager", "admin"] },
     }).select("name firstname lastname workingHours");
     if (!staff) {
       return res.status(404).json({ message: "Staff member not found." });
@@ -792,11 +657,6 @@ export const assignAppointmentStaff = async (req, res, next) => {
 };
 
 export const getAppointmentById = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
   try {
     const appointment = await Appointment.findOne({
       _id: req.params.id,
@@ -909,16 +769,8 @@ export const getAppointmentById = async (req, res, next) => {
 };
 
 export const getAvailability = async (req, res, next) => {
-  const validation = availabilitySchema.safeParse(req.query);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid availability request.",
-    });
-  }
-
   try {
-    const { serviceId, date, excludeAppointmentId } = validation.data;
+    const { serviceId, date, excludeAppointmentId } = req.query;
     const availability = await getAvailabilityForService({
       serviceId,
       date,
@@ -932,16 +784,7 @@ export const getAvailability = async (req, res, next) => {
 };
 
 export const getAvailabilityCalendar = async (req, res, next) => {
-  const validation = availabilityCalendarSchema.safeParse(req.query);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message ||
-        "Invalid availability calendar request.",
-    });
-  }
-
-  const { serviceId, from, to } = validation.data;
+  const { serviceId, from, to } = req.query;
   if (dateDifferenceInDays(from, to) > 92) {
     return res.status(400).json({
       message: "Choose a date range of 93 days or less.",
@@ -1012,17 +855,9 @@ export const getAvailabilityCalendar = async (req, res, next) => {
 };
 
 export const createStaffAppointment = async (req, res, next) => {
-  const validation = createStaffAppointmentSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid appointment details.",
-    });
-  }
-
   try {
     const { customerId, walkInCustomer, serviceId, date, startTime } =
-      validation.data;
+      req.body;
     const [customerRecord, service] = await Promise.all([
       customerId
         ? User.findOne({ _id: customerId, role: "customer" }).select(
@@ -1248,13 +1083,8 @@ export const createReminderTestAppointments = async (req, res, next) => {
 };
 
 export const getStaffAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
   try {
-    const appointment = await Appointment.findById(validation.data.id)
+    const appointment = await Appointment.findById(req.query.id)
       .populate("service", "name price durationMinutes")
       .populate("staff", "name firstname lastname")
       .populate("customer", "name firstname lastname");
@@ -1306,16 +1136,8 @@ export const getStaffAppointment = async (req, res, next) => {
 };
 
 export const createAppointment = async (req, res, next) => {
-  const validation = createAppointmentSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid appointment details.",
-    });
-  }
-
   try {
-    const { serviceId, date, startTime } = validation.data;
+    const { serviceId, date, startTime } = req.body;
     const service = await Service.findOne({ _id: serviceId, isActive: true });
     if (!service) {
       return res.status(404).json({ message: "Choose an available service." });
@@ -1392,11 +1214,6 @@ export const createAppointment = async (req, res, next) => {
 };
 
 export const confirmAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
   try {
     const appointment = await Appointment.findById(req.params.id).populate(
       "service",
@@ -1527,11 +1344,6 @@ export const confirmAppointment = async (req, res, next) => {
 };
 
 export const cancelStaffAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
   try {
     const appointment = await Appointment.findById(req.params.id).populate(
       "service",
@@ -1595,22 +1407,8 @@ export const cancelStaffAppointment = async (req, res, next) => {
 };
 
 export const rescheduleAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
-  const bodyValidation = rescheduleSchema.safeParse(req.body);
-  if (!bodyValidation.success) {
-    return res.status(400).json({
-      message:
-        bodyValidation.error.issues[0]?.message ||
-        "Invalid reschedule request.",
-    });
-  }
-
   try {
-    const { date, startTime } = bodyValidation.data;
+    const { date, startTime } = req.body;
     const appointment = await Appointment.findOne({
       _id: req.params.id,
       customer: req.user.id,
@@ -1705,22 +1503,8 @@ export const rescheduleAppointment = async (req, res, next) => {
 };
 
 export const rescheduleStaffAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
-  const bodyValidation = rescheduleSchema.safeParse(req.body);
-  if (!bodyValidation.success) {
-    return res.status(400).json({
-      message:
-        bodyValidation.error.issues[0]?.message ||
-        "Invalid reschedule request.",
-    });
-  }
-
   try {
-    const { date, startTime } = bodyValidation.data;
+    const { date, startTime } = req.body;
     const appointment = await Appointment.findById(req.params.id).populate(
       "service",
       "name durationMinutes price",
@@ -1820,11 +1604,6 @@ export const rescheduleStaffAppointment = async (req, res, next) => {
 };
 
 export const cancelAppointment = async (req, res, next) => {
-  const validation = appointmentDetailSchema.safeParse({ id: req.params.id });
-  if (!validation.success) {
-    return res.status(400).json({ message: "Invalid appointment id." });
-  }
-
   try {
     const appointment = await Appointment.findOne({
       _id: req.params.id,

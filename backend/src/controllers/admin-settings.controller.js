@@ -1,36 +1,13 @@
-import { z } from "zod";
 
 import IntegrationSettings from "../models/integrationSettings.model.js";
 import { encryptSecret } from "../utils/integrationSecrets.js";
-
-const settingsSchema = z
-  .object({
-    emailNotifications: z.boolean(),
-    appointmentReminders: z.boolean(),
-    googleCalendar: z.boolean(),
-    googleLogin: z.boolean(),
-    embeddedMaps: z.boolean(),
-    recaptchaRequired: z.boolean(),
-    googleClientId: z.string().trim().max(254).optional(),
-    googleClientSecret: z.string().max(500).optional(),
-    googleOauthRedirectUri: z.string().trim().url().max(500).optional(),
-    calendarId: z.string().trim().max(254).optional(),
-    calendarEmbedUrl: z.string().trim().url().max(1000).optional(),
-    googleCalendarRedirectUri: z.string().trim().url().max(500).optional(),
-    smtpHost: z.string().trim().max(254).optional(),
-    smtpPort: z.string().trim().max(10).optional(),
-    smtpUser: z.string().trim().max(254).optional(),
-    smtpPass: z.string().max(500).optional(),
-    smtpFrom: z.string().trim().max(254).optional(),
-    recaptchaSecretKey: z.string().max(500).optional(),
-    resetCredentials: z.boolean().optional(),
-  })
-  .strict();
 
 const settingsFields = [
   "emailNotifications",
   "appointmentReminders",
   "googleCalendar",
+  "googleDrive",
+  "pdfReports",
   "calendarId",
   "calendarEmbedUrl",
   "googleLogin",
@@ -44,6 +21,7 @@ const secretFields = [
   "googleOauthRedirectUri",
   "googleCalendarRedirectUri",
   "calendarRefreshToken",
+  "driveRefreshToken",
   "smtpHost",
   "smtpPort",
   "smtpUser",
@@ -53,7 +31,7 @@ const secretFields = [
 ];
 
 const editableSecretFields = secretFields.filter(
-  (field) => field !== "calendarRefreshToken",
+  (field) => !["calendarRefreshToken", "driveRefreshToken"].includes(field),
 );
 
 const getSettings = async () =>
@@ -65,13 +43,18 @@ const getSettings = async () =>
 
 const publicSettings = (settings) => ({
   ...Object.fromEntries(
-    settingsFields.map((field) => [field, settings[field]]),
+    settingsFields.map((field) => [
+      field,
+      field === "pdfReports" ? settings.pdfReports !== false : settings[field],
+    ]),
   ),
   secretsConfigured: Object.fromEntries(
     secretFields.map((field) => [field, Boolean(settings[field])]),
   ),
   calendarConnected: Boolean(settings.calendarRefreshToken),
   calendarEmail: settings.calendarEmail || "",
+  driveConnected: Boolean(settings.driveRefreshToken),
+  driveEmail: settings.driveEmail || "",
 });
 
 export const readIntegrationSettings = async (req, res, next) => {
@@ -85,27 +68,19 @@ export const readIntegrationSettings = async (req, res, next) => {
 };
 
 export const updateIntegrationSettings = async (req, res, next) => {
-  const validation = settingsSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({
-      message:
-        validation.error.issues[0]?.message || "Invalid integration settings.",
-    });
-  }
-
   try {
     const update = Object.fromEntries(
-      settingsFields.map((field) => [field, validation.data[field]]),
+      settingsFields.map((field) => [field, req.body[field]]),
     );
     const unset = {
       smsNotifications: 1,
       whatsappNotifications: 1,
     };
     for (const field of secretFields) {
-      if (validation.data[field])
-        update[field] = encryptSecret(validation.data[field]);
+      if (req.body[field])
+        update[field] = encryptSecret(req.body[field]);
     }
-    if (validation.data.resetCredentials) {
+    if (req.body.resetCredentials) {
       for (const field of editableSecretFields) unset[field] = 1;
     }
 
