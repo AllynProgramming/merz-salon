@@ -16,6 +16,36 @@ const mockAppointments = new Map(
 );
 let cachedServices = [];
 
+function sortServices(services) {
+  return [...services].sort((first, second) =>
+    (first.name || "").localeCompare(second.name || ""),
+  );
+}
+
+function syncCachedServices(serviceOrServices) {
+  if (Array.isArray(serviceOrServices)) {
+    cachedServices = sortServices(serviceOrServices);
+    return;
+  }
+
+  if (!serviceOrServices || typeof serviceOrServices !== "object") {
+    return;
+  }
+
+  const nextService = serviceOrServices.service || serviceOrServices;
+  if (!nextService || !nextService._id) {
+    return;
+  }
+
+  cachedServices = sortServices(
+    cachedServices.some((item) => item._id === nextService._id)
+      ? cachedServices.map((item) =>
+          item._id === nextService._id ? { ...item, ...nextService } : item,
+        )
+      : [...cachedServices, nextService],
+  );
+}
+
 function persistMockAppointments() {
   sessionStorage.setItem(
     MOCK_APPOINTMENTS_KEY,
@@ -188,7 +218,7 @@ export async function getServices({ category = "", search = "", limit } = {}) {
   const suffix = params.size ? `?${params}` : "";
   const payload = await request(`/api/services${suffix}`);
   const services = Array.isArray(payload) ? payload : payload.services || [];
-  cachedServices = services;
+  syncCachedServices(services);
   return services;
 }
 
@@ -205,36 +235,44 @@ export async function getAdminServices(token) {
 }
 
 export async function createService(service, token) {
-  return request("/api/services", {
+  const payload = await request("/api/services", {
     method: "POST",
     token,
     body: JSON.stringify(service),
   });
+  syncCachedServices(payload);
+  return payload;
 }
 
 export async function updateService(serviceId, service, token) {
-  return request(`/api/services/${encodeURIComponent(serviceId)}`, {
+  const payload = await request(`/api/services/${encodeURIComponent(serviceId)}`, {
     method: "PUT",
     token,
     body: JSON.stringify(service),
   });
+  syncCachedServices(payload);
+  return payload;
 }
 
 export async function archiveService(serviceId, token) {
-  return request(
+  const payload = await request(
     `/api/services/${encodeURIComponent(serviceId)}/archive`,
     {
       method: "PATCH",
       token,
     },
   );
+  syncCachedServices(payload);
+  return payload;
 }
 
 export async function restoreService(serviceId, token) {
-  return request(
+  const payload = await request(
     `/api/services/${encodeURIComponent(serviceId)}/restore`,
     { method: "PATCH", token },
   );
+  syncCachedServices(payload);
+  return payload;
 }
 
 export async function searchBookingCustomers(search, token) {
