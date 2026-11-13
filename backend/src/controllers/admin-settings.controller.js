@@ -1,6 +1,9 @@
 
 import IntegrationSettings from "../models/integrationSettings.model.js";
-import { encryptSecret } from "../utils/integrationSecrets.js";
+import {
+  encryptSecret,
+  getIntegrationSecrets,
+} from "../utils/integrationSecrets.js";
 
 const settingsFields = [
   "emailNotifications",
@@ -41,7 +44,7 @@ const getSettings = async () =>
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).lean();
 
-const publicSettings = (settings) => ({
+const publicSettings = (settings = {}, secrets = {}) => ({
   ...Object.fromEntries(
     settingsFields.map((field) => [
       field,
@@ -51,7 +54,7 @@ const publicSettings = (settings) => ({
   secretsConfigured: Object.fromEntries(
     secretFields.map((field) => [field, Boolean(settings[field])]),
   ),
-  calendarConnected: Boolean(settings.calendarRefreshToken),
+  calendarConnected: Boolean(secrets.calendarRefreshToken),
   calendarEmail: settings.calendarEmail || "",
   driveConnected: Boolean(settings.driveRefreshToken),
   driveEmail: settings.driveEmail || "",
@@ -59,9 +62,11 @@ const publicSettings = (settings) => ({
 
 export const readIntegrationSettings = async (req, res, next) => {
   try {
+    const settings = await getSettings();
+    const secrets = await getIntegrationSecrets(IntegrationSettings);
     return res
       .status(200)
-      .json({ settings: publicSettings(await getSettings()) });
+      .json({ settings: publicSettings(settings, secrets) });
   } catch (error) {
     return next(error);
   }
@@ -97,9 +102,10 @@ export const updateIntegrationSettings = async (req, res, next) => {
         runValidators: true,
       },
     ).lean();
+    const secrets = await getIntegrationSecrets(IntegrationSettings);
     return res.status(200).json({
       message: "Integration settings saved.",
-      settings: publicSettings(settings),
+      settings: publicSettings(settings, secrets),
     });
   } catch (error) {
     return next(error);
@@ -111,16 +117,23 @@ export const getIntegrationSettings = getSettings;
 export const readPublicIntegrationSettings = async (req, res, next) => {
   try {
     const settings = await getSettings();
-    const calendarSource = settings.calendarEmail || settings.calendarId;
+    const configuredCalendarId =
+      settings.calendarId && settings.calendarId !== "CALENDAR_ID"
+        ? settings.calendarId
+        : "primary";
+    const calendarSource =
+      settings.calendarEmail && settings.calendarEmail !== "CALENDAR_ID"
+        ? settings.calendarEmail
+        : configuredCalendarId;
+    const savedEmbedUrl = settings.calendarEmbedUrl || "";
     const calendarEmbedUrl =
-      settings.calendarEmbedUrl ||
-      (calendarSource
-        ? `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(
+      savedEmbedUrl && !savedEmbedUrl.includes("CALENDAR_ID")
+        ? savedEmbedUrl
+        : `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(
             calendarSource,
           )}&ctz=${encodeURIComponent(
             process.env.SALON_TIMEZONE || "Asia/Manila",
-          )}`
-        : "");
+          )}`;
     return res.status(200).json({
       embeddedMaps: settings.embeddedMaps !== false,
       googleCalendar: settings.googleCalendar === true,

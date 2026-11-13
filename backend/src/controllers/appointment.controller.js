@@ -16,6 +16,7 @@ import {
   createAppointmentNotifications,
   syncReminderState,
 } from "../services/notification.service.js";
+import { syncAppointmentToGoogleCalendar } from "../services/google-calendar.service.js";
 import {
   getSalonClock,
   hasPassedConfirmationDeadline,
@@ -615,6 +616,11 @@ export const assignAppointmentStaff = async (req, res, next) => {
     if (!staffId) {
       appointment.staff = null;
       await appointment.save();
+      try {
+        await syncAppointmentToGoogleCalendar(appointment);
+      } catch (error) {
+        console.error("Failed to sync staff removal to Google Calendar:", error.message);
+      }
       return res.status(200).json({
         message: "Staff member removed from appointment.",
         staffId: null,
@@ -666,6 +672,11 @@ export const assignAppointmentStaff = async (req, res, next) => {
 
     appointment.staff = staff._id;
     await appointment.save();
+    try {
+      await syncAppointmentToGoogleCalendar(appointment);
+    } catch (error) {
+      console.error("Failed to sync staff assignment to Google Calendar:", error.message);
+    }
     if (previousStaffId !== String(staff._id)) {
       await notifyStaffOfAssignment({
         appointment,

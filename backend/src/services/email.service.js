@@ -12,6 +12,15 @@ const escapeHtml = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
+const isDeliverableEmail = (value) => {
+  const email = String(value || "").trim();
+  return (
+    email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    !email.toLowerCase().endsWith("@walkin.local")
+  );
+};
+
 const getTransport = async () => {
   let secrets = {};
   try {
@@ -63,13 +72,16 @@ export const sendAppointmentEmail = async ({
   message,
 }) => {
   try {
-    const customerId = appointment?.customer?._id || appointment?.customer;
-    if (!customerId) return false;
-
-    const customer = appointment.customer?.email
-      ? appointment.customer
-      : await User.findById(customerId).select("name email").lean();
-    if (!customer?.email) return false;
+    const staffId = appointment?.staff?._id || appointment?.staff;
+    const staff = appointment?.staff?.email
+      ? appointment.staff
+      : await User.findById(staffId).select("name email").lean();
+    if (!isDeliverableEmail(staff?.email)) {
+      console.info(
+        "Appointment email was not sent: assigned staff member does not have a deliverable email address.",
+      );
+      return false;
+    }
 
     const emailConfig = await getTransport();
     if (!emailConfig) {
@@ -94,7 +106,7 @@ export const sendAppointmentEmail = async ({
     await emailConfig.transport.sendMail({
       from:
         emailConfig.from,
-      to: customer.email,
+      to: staff.email.trim(),
       subject: `MERZ Beauty Salon: ${title}`,
       text: `${title}\n\n${message}\n\n${details.join("\n")}`,
       html: `
