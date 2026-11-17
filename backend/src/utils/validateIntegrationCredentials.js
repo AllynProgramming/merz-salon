@@ -33,6 +33,9 @@ const validateGoogleCredentials = async (clientId, clientSecret) => {
       "The client ID or client secret is invalid.",
     );
   }
+  if (payload.error !== "invalid_grant") {
+    throw new Error("Google credentials could not be verified.");
+  }
 };
 
 const validateRecaptchaSecret = async (secret) => {
@@ -49,7 +52,7 @@ const validateRecaptchaSecret = async (secret) => {
   if (payload["error-codes"]?.includes("invalid-input-secret")) {
     throw validationError(
       "reCAPTCHA secret key",
-      "The secret key is invalid.",
+      "Secret key is invalid",
     );
   }
 };

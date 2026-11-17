@@ -357,6 +357,7 @@ function AdminSettingsPage() {
       setEditingCredential(null);
       setNotice(`${field.label} saved.`);
     } catch (requestError) {
+      window.alert("Invalid credential");
       setError(requestError.message);
     } finally {
       setSaving(false);
