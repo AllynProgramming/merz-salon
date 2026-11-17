@@ -4,6 +4,7 @@ import {
   encryptSecret,
   getIntegrationSecrets,
 } from "../utils/integrationSecrets.js";
+import { validateIntegrationCredentials } from "../utils/validateIntegrationCredentials.js";
 
 const settingsFields = [
   "emailNotifications",
@@ -74,6 +75,18 @@ export const readIntegrationSettings = async (req, res, next) => {
 
 export const updateIntegrationSettings = async (req, res, next) => {
   try {
+    const changedFields = new Set(
+      secretFields.filter(
+        (field) =>
+          Object.prototype.hasOwnProperty.call(req.body, field) &&
+          req.body[field],
+      ),
+    );
+    const existingSecrets = await getIntegrationSecrets(IntegrationSettings);
+    const credentials = { ...existingSecrets };
+    for (const field of changedFields) credentials[field] = req.body[field];
+    await validateIntegrationCredentials({ credentials, changedFields });
+
     const update = Object.fromEntries(
       settingsFields.map((field) => [field, req.body[field]]),
     );

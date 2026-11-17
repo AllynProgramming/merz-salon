@@ -22,7 +22,7 @@ const settingsSchema = z
     smtpPort: z.string().trim().max(10).optional(),
     smtpUser: z.string().trim().max(254).optional(),
     smtpPass: z.string().max(500).optional(),
-    smtpFrom: z.string().trim().max(254).optional(),
+    smtpFrom: z.string().trim().email().max(254).optional(),
     recaptchaSecretKey: z.string().max(500).optional(),
     resetCredentials: z.boolean().optional(),
   })
