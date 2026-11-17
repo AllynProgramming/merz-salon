@@ -676,10 +676,11 @@ function AdminSchedulePage() {
           </section>
         )}
 
-        {googleCalendarEnabled &&
+        {token &&
           (googleCalendarLoading ||
             googleCalendarError ||
-            googleCalendar.connected) && (
+            googleCalendar.connected ||
+            googleCalendarEnabled) && (
             <section
               className="customer-panel admin-schedule__google-calendar"
               aria-labelledby="google-calendar-heading"
@@ -704,6 +705,11 @@ function AdminSchedulePage() {
                   role="alert"
                 >
                   {googleCalendarError}
+                </p>
+              ) : !googleCalendar.connected ? (
+                <p className="admin-schedule__google-calendar-status">
+                  Google Calendar is not connected. Reconnect it in Settings to
+                  sync staff appointments.
                 </p>
               ) : googleCalendar.events.length === 0 ? (
                 <p className="admin-schedule__google-calendar-status">

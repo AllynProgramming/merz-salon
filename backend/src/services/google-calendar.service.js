@@ -5,12 +5,20 @@ import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
 
 const calendarApi = "https://www.googleapis.com/calendar/v3";
 
+const googleCalendarError = (message, cause) =>
+  Object.assign(new Error(message), { statusCode: 502, cause });
+
+const getCalendarId = (value) => {
+  const calendarId = String(value || "").trim();
+  return !calendarId || calendarId === "CALENDAR_ID" ? "primary" : calendarId;
+};
+
 const getConfig = async () => {
   const settings = await IntegrationSettings.findOne({ key: "default" }).lean();
   const secrets = await getIntegrationSecrets(IntegrationSettings);
-  const clientId = secrets.googleClientId || process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID || secrets.googleClientId;
   const clientSecret =
-    secrets.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET;
+    process.env.GOOGLE_CLIENT_SECRET || secrets.googleClientSecret;
 
   if (
     !settings?.googleCalendar ||
@@ -26,7 +34,7 @@ const getConfig = async () => {
     refreshToken: secrets.calendarRefreshToken,
     clientId,
     clientSecret,
-    calendarId: settings.calendarId || "primary",
+    calendarId: getCalendarId(settings.calendarId),
   };
 };
 
@@ -43,8 +51,9 @@ const getAccessToken = async (config) => {
   });
   const payload = await response.json();
   if (!response.ok || !payload.access_token) {
-    throw new Error(
-      payload.error_description || "Could not refresh Google Calendar access.",
+    throw googleCalendarError(
+      "Google Calendar authentication failed. Reconnect Google Calendar in Settings.",
+      payload.error_description || payload.error,
     );
   }
   return payload.access_token;
@@ -63,8 +72,9 @@ const calendarRequest = async (config, path, options = {}) => {
   if (response.status === 204) return null;
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
-      payload.error?.message || "Google Calendar request failed.",
+    throw googleCalendarError(
+      "Google Calendar request failed. Check the calendar connection and calendar ID.",
+      payload.error?.message,
     );
   }
   return payload;
@@ -74,12 +84,25 @@ const formatDate = (date) => new Date(date).toISOString().slice(0, 10);
 
 const buildEvent = async (appointment) => {
   const customerId = appointment.customer?._id || appointment.customer;
-  const customer = appointment.customer?.email
-    ? appointment.customer
-    : await User.findById(customerId).select("name email").lean();
+  const staffId = appointment.staff?._id || appointment.staff;
+  const [customer, staff] = await Promise.all([
+    appointment.customer?.email
+      ? Promise.resolve(appointment.customer)
+      : User.findById(customerId).select("name email").lean(),
+    appointment.staff?.email
+      ? Promise.resolve(appointment.staff)
+      : User.findById(staffId).select("name email").lean(),
+  ]);
+  const walkInCustomer = appointment.walkInCustomer;
   const serviceName = appointment.service?.name || "Salon appointment";
   const date = formatDate(appointment.date);
   const timeZone = process.env.SALON_TIMEZONE || "Asia/Manila";
+  const attendeeEmails = [
+    customer?.email || walkInCustomer?.email,
+    staff?.email,
+  ]
+    .map((email) => String(email || "").trim().toLowerCase())
+    .filter((email, index, emails) => email && emails.indexOf(email) === index);
 
   return {
     summary: `${appointment.status === "cancelled" ? "[Cancelled] " : ""}${serviceName}`,
@@ -89,13 +112,17 @@ const buildEvent = async (appointment) => {
       appointment.bookingReference
         ? `Booking reference: ${appointment.bookingReference}`
         : "",
-      customer?.name ? `Customer: ${customer.name}` : "",
+      customer?.name || walkInCustomer?.name
+        ? `Customer: ${customer?.name || walkInCustomer.name}`
+        : "",
     ]
       .filter(Boolean)
       .join("\n"),
     start: { dateTime: `${date}T${appointment.startTime}:00`, timeZone },
     end: { dateTime: `${date}T${appointment.endTime}:00`, timeZone },
-    attendees: customer?.email ? [{ email: customer.email }] : undefined,
+    attendees: attendeeEmails.length
+      ? attendeeEmails.map((email) => ({ email }))
+      : undefined,
   };
 };
 
@@ -105,16 +132,24 @@ export const syncAppointmentToGoogleCalendar = async (appointment) => {
 
   const event = await buildEvent(appointment);
   const basePath = `/calendars/${encodeURIComponent(config.calendarId)}/events`;
-  const synced = appointment.calendarEventId
-    ? await calendarRequest(
+  let synced;
+  if (appointment.calendarEventId) {
+    try {
+      synced = await calendarRequest(
         config,
-        `${basePath}/${encodeURIComponent(appointment.calendarEventId)}`,
+        `${basePath}/${encodeURIComponent(appointment.calendarEventId)}?sendUpdates=all`,
         { method: "PATCH", body: JSON.stringify(event) },
-      )
-    : await calendarRequest(config, basePath, {
-        method: "POST",
-        body: JSON.stringify(event),
-      });
+      );
+    } catch (error) {
+      if (error.statusCode !== 404) throw error;
+    }
+  }
+  if (!synced) {
+    synced = await calendarRequest(config, `${basePath}?sendUpdates=all`, {
+      method: "POST",
+      body: JSON.stringify(event),
+    });
+  }
 
   if (synced?.id && synced.id !== appointment.calendarEventId) {
     await Appointment.updateOne(

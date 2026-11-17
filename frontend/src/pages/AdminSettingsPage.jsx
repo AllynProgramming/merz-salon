@@ -20,6 +20,28 @@ const initialSettings = {
   driveConnected: false,
   driveEmail: "",
 };
+
+const calendarErrorMessages = {
+  authorization_denied:
+    "Google Calendar connection was cancelled or denied. Please try again and allow calendar access.",
+  redirect_uri_mismatch:
+    "Google rejected the callback address. Check that the Google OAuth redirect URI is exactly http://localhost:3000/api/admin/calendar/callback.",
+  refresh_token_missing:
+    "Google did not return a refresh token. Reconnect and approve calendar access again.",
+  oauth_credentials_rejected:
+    "Google rejected the OAuth credentials. Verify the client ID, client secret, and callback URI in the backend configuration.",
+  timezone_update_failed:
+    "Google Calendar connected, but its timezone could not be set to the salon timezone. Set the calendar timezone to Asia/Manila and reconnect.",
+  connection_failed:
+    "Google Calendar could not be connected. Check the backend logs for the provider error, then try again.",
+};
+
+const initialCalendarError = () => {
+  const errorCode = new URLSearchParams(window.location.search).get(
+    "calendar_error",
+  );
+  return calendarErrorMessages[errorCode] || "";
+};
 const SETTINGS_ACCESS_KEY = "merz.admin.settings.access";
 
 const integrationItems = [
@@ -166,7 +188,7 @@ function AdminSettingsPage() {
   const [settings, setSettings] = useState(initialSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialCalendarError);
   const [notice, setNotice] = useState("");
   const [credentials, setCredentials] = useState({});
   const [credentialValues, setCredentialValues] = useState({});

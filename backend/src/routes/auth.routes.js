@@ -1,4 +1,6 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
+
 import {
   register,
   signup,
@@ -19,10 +21,23 @@ import {
 } from "../middlewares/auth-validation.middleware.js";
 
 const router = Router();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many login attempts. Try again later." },
+});
 
 router.post("/register", validateBody(signupSchema, { message: "Invalid registration data" }), register);
 router.post("/signup", validateBody(signupSchema, { message: "Invalid registration data" }), signup);
-router.post("/login", verifyRecaptcha(), validateBody(loginSchema, { message: "Invalid login data" }), login);
+router.post(
+  "/login",
+  loginLimiter,
+  verifyRecaptcha(),
+  validateBody(loginSchema, { message: "Invalid login data" }),
+  login,
+);
 router.post("/logout", logout);
 router.get("/me", protect, getMe);
 router.get("/google", googleLogin);

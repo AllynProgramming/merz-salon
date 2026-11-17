@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 
 import {
   cancelAppointment,
@@ -24,6 +25,13 @@ import {
 } from "../middlewares/appointment.middleware.js";
 
 const router = Router();
+const bookingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many booking attempts. Try again later." },
+});
 
 router.use(protect, requireCustomer);
 router.get(
@@ -33,7 +41,12 @@ router.get(
 );
 router.get("/availability", validateQuery(availabilitySchema), getAvailability);
 router.get("/", validateQuery(appointmentQuerySchema), listAppointments);
-router.post("/", validateBody(createAppointmentSchema), createAppointment);
+router.post(
+  "/",
+  bookingLimiter,
+  validateBody(createAppointmentSchema),
+  createAppointment,
+);
 router.get(
   "/:id/feedback",
   validateParams(appointmentDetailSchema),

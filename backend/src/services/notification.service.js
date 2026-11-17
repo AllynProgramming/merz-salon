@@ -81,34 +81,46 @@ export async function createAppointmentNotifications({
   message,
   title,
 }) {
-  if (!appointment || !appointment.customer) return null;
+  if (!appointment) return null;
 
-  const notification = await createNotification({
-    userId: appointment.customer?._id || appointment.customer,
-    appointmentId: appointment._id,
-    type,
-    title,
-    message,
-  });
-
-  if (!notification || type === "reminder") return notification;
-
-  const settings = await IntegrationSettings.findOne({
-    key: "default",
-  }).lean();
-  if (settings?.emailNotifications !== false) {
-    notification.emailSent = await sendAppointmentEmail({
-      appointment,
-      title,
-      message,
-    });
-    await notification.save();
-  }
-  if (["booking_pending", "booking_confirmed", "cancelled", "rescheduled", "booking_expired"].includes(type)) {
+  if (
+    [
+      "booking_pending",
+      "booking_confirmed",
+      "cancelled",
+      "rescheduled",
+      "booking_expired",
+    ].includes(type)
+  ) {
     try {
       await syncAppointmentToGoogleCalendar(appointment);
     } catch (error) {
       console.error("Failed to sync appointment to Google Calendar:", error.message);
+    }
+  }
+
+  const notification = appointment.customer
+    ? await createNotification({
+        userId: appointment.customer?._id || appointment.customer,
+        appointmentId: appointment._id,
+        type,
+        title,
+        message,
+      })
+    : null;
+
+  const settings = await IntegrationSettings.findOne({
+    key: "default",
+  }).lean();
+  if (settings?.emailNotifications !== false && type !== "reminder") {
+    const emailSent = await sendAppointmentEmail({
+      appointment,
+      title,
+      message,
+    });
+    if (notification) {
+      notification.emailSent = emailSent;
+      await notification.save();
     }
   }
   return notification;
