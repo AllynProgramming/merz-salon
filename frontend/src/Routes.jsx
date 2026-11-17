@@ -23,12 +23,16 @@ import StaffBookingSuccessPage from "./pages/StaffBookingSuccessPage.jsx";
 import AdminSettingsPage from "./pages/AdminSettingsPage.jsx";
 import GoogleCallbackPage from "./pages/GoogleCallbackPage.jsx";
 import StaffChangePasswordPage from "./pages/StaffChangePasswordPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
 function Routes() {
   const routes = createBrowserRouter([
     { path: "/", element: <LandingPage /> },
     { path: "/services", element: <ServicesPage /> },
     { path: "/login", element: <LoginPage /> },
+    { path: "/forgot-password", element: <ForgotPasswordPage /> },
+    { path: "/reset-password", element: <ResetPasswordPage /> },
     { path: "/register", element: <RegisterPage /> },
     { path: "/auth/google/callback", element: <GoogleCallbackPage /> },
     {

@@ -10,6 +10,8 @@ import {
   updateMe,
   googleLogin,
   googleCallback,
+  requestPasswordReset,
+  resetPassword,
 } from "../controllers/auth.controller.js";
 import { protect, requireCustomer } from "../middlewares/auth.middleware.js";
 import { verifyRecaptcha } from "../middlewares/recaptcha.middleware.js";
@@ -18,6 +20,8 @@ import {
   signupSchema,
   loginSchema,
   updateMeSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../middlewares/auth-validation.middleware.js";
 
 const router = Router();
@@ -39,6 +43,16 @@ router.post(
   login,
 );
 router.post("/logout", logout);
+router.post(
+  "/forgot-password",
+  validateBody(forgotPasswordSchema, { message: "Enter a valid email address" }),
+  requestPasswordReset,
+);
+router.post(
+  "/reset-password",
+  validateBody(resetPasswordSchema, { message: "Invalid password reset data" }),
+  resetPassword,
+);
 router.get("/me", protect, getMe);
 router.get("/google", googleLogin);
 router.get("/google/callback", googleCallback);

@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import IntegrationSettings from "../models/integrationSettings.model.js";
 import { getIntegrationSecrets } from "../utils/integrationSecrets.js";
+import { sendEmail } from "../services/email.service.js";
 
 const generateToken = (userId) => {
   if (!process.env.JWT_SECRET) {
@@ -119,6 +120,70 @@ export const logout = (req, res) => {
   return res.status(200).json({
     message: "Logged out. Remove the bearer token from this client.",
   });
+};
+
+const passwordResetMessage =
+  "If an account exists for that email, a password reset link has been sent.";
+
+export const requestPasswordReset = async (req, res, next) => {
+  try {
+    const user = await User.findOne({
+      email: req.body.email.toLowerCase(),
+    }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+    if (user && !user.email.toLowerCase().endsWith("@walkin.local")) {
+      const token = crypto.randomBytes(32).toString("hex");
+      user.passwordResetTokenHash = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+      user.passwordResetExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await user.save();
+
+      const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${encodeURIComponent(token)}`;
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your MERZ Beauty Salon password",
+        text: `Use this link to reset your password. It expires in 30 minutes:\n\n${resetUrl}`,
+        html: `<p>Use this link to reset your password. It expires in 30 minutes:</p><p><a href="${resetUrl}">Reset your password</a></p>`,
+      });
+    }
+
+    return res.status(200).json({ message: passwordResetMessage });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(req.body.token)
+      .digest("hex");
+    const user = await User.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+    }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+    if (!user) {
+      return res.status(400).json({
+        message: "This password reset link is invalid or expired.",
+      });
+    }
+
+    user.password = await bcrypt.hash(req.body.password, 12);
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
+    user.mustChangePassword = false;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Your password has been reset. You can now log in.",
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 export const getMe = (req, res) => {

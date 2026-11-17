@@ -45,6 +45,30 @@ const loginSchema = z.object({
   password: z.string().min(1, "Enter your password").max(128),
 });
 
+const passwordSchema = z
+  .string()
+  .min(8, "Use at least 8 characters for your password.")
+  .max(128)
+  .refine((value) => /[a-z]/i.test(value), {
+    message: "Add at least one letter to your password.",
+  })
+  .refine((value) => /\d/.test(value), {
+    message: "Add at least one number to your password.",
+  });
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address").max(254),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "This password reset link is invalid."),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Your passwords do not match.",
+  path: ["confirmPassword"],
+});
+
 const updateMeSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
@@ -63,5 +87,7 @@ const updateMeSchema = z
 export { signupSchema };
 export { loginSchema };
 export { updateMeSchema };
+export { forgotPasswordSchema };
+export { resetPasswordSchema };
 
 export { validateBody, validateQuery, validateParams } from "./request-validation.middleware.js";
