@@ -15,15 +15,21 @@ import {
 } from "../controllers/google-drive.controller.js";
 import { protect, requireAdmin } from "../middlewares/auth.middleware.js";
 import { requireAdminSettingsAccess } from "../middlewares/admin-settings-access.middleware.js";
-import { settingsSchema, validateBody } from "../middlewares/admin-settings.middleware.js";
+import {
+  settingsSchema,
+  validateBody,
+} from "../middlewares/admin-settings.middleware.js";
 
 const router = Router();
+
 const accessLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 5 * 60 * 1000, // Changed from 15 to 5 (5 minutes)
   limit: 5,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  message: { message: "Too many settings verification attempts. Try again later." },
+  message: {
+    message: "Too many settings verification attempts. Try again later.",
+  },
 });
 
 router.get("/drive/callback", googleDriveCallback);

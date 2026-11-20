@@ -148,7 +148,7 @@ function LoginPage() {
           <button
             className="auth-text-link"
             type="button"
-            aria-label="Forgot password? This link is not connected yet."
+            onClick={() => navigate("/forgot-password")}
           >
             Forgot password?
           </button>
