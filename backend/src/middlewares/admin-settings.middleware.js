@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-
+const optionalUrl = (max) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine(
+      (value) => !value || z.string().url().safeParse(value).success,
+    );
 
 const settingsSchema = z
   .object({
@@ -14,10 +21,10 @@ const settingsSchema = z
     recaptchaRequired: z.boolean(),
     googleClientId: z.string().trim().max(254).optional(),
     googleClientSecret: z.string().max(500).optional(),
-    googleOauthRedirectUri: z.string().trim().url().max(500).optional(),
+    googleOauthRedirectUri: optionalUrl(500).optional(),
     calendarId: z.string().trim().max(254).optional(),
-    calendarEmbedUrl: z.string().trim().url().max(1000).optional(),
-    googleCalendarRedirectUri: z.string().trim().url().max(500).optional(),
+    calendarEmbedUrl: optionalUrl(1000).optional(),
+    googleCalendarRedirectUri: optionalUrl(500).optional(),
     smtpHost: z.string().trim().max(254).optional(),
     smtpPort: z.string().trim().max(10).optional(),
     smtpUser: z.string().trim().max(254).optional(),

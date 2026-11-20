@@ -24,16 +24,16 @@ const validateGoogleCredentials = async (clientId, clientSecret) => {
     signal: AbortSignal.timeout(5000),
   });
   const payload = await response.json().catch(() => ({}));
-  if (
-    payload.error === "invalid_client" ||
-    payload.error === "unauthorized_client"
-  ) {
+  if (payload.error === "invalid_client") {
     throw validationError(
       "Google credentials",
       "The client ID or client secret is invalid.",
     );
   }
-  if (payload.error !== "invalid_grant") {
+  if (
+    payload.error !== "invalid_grant" &&
+    payload.error !== "unauthorized_client"
+  ) {
     throw new Error("Google credentials could not be verified.");
   }
 };
@@ -49,11 +49,15 @@ const validateRecaptchaSecret = async (secret) => {
     signal: AbortSignal.timeout(5000),
   });
   const payload = await response.json().catch(() => ({}));
-  if (payload["error-codes"]?.includes("invalid-input-secret")) {
-    throw validationError(
-      "reCAPTCHA secret key",
-      "Secret key is invalid",
-    );
+  const errorCodes = payload["error-codes"] || [];
+  if (errorCodes.includes("invalid-input-secret")) {
+    throw validationError("reCAPTCHA secret key", "Secret key is invalid");
+  }
+  if (
+    payload.success !== true &&
+    !errorCodes.includes("invalid-input-response")
+  ) {
+    throw new Error("reCAPTCHA secret key could not be verified.");
   }
 };
 
@@ -82,11 +86,14 @@ const validateSmtpCredentials = async (credentials) => {
   });
   try {
     await transport.verify();
-  } catch {
-    throw validationError(
-      "SMTP credentials",
-      "The SMTP host, username, or password is invalid.",
-    );
+  } catch (error) {
+    if (error.code === "EAUTH" || Number(error.responseCode) === 535) {
+      throw validationError(
+        "SMTP credentials",
+        "The SMTP username or password is invalid.",
+      );
+    }
+    throw new Error("SMTP server could not be verified.");
   } finally {
     transport.close();
   }

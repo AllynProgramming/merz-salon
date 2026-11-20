@@ -72,6 +72,7 @@
 .customer-page-heading h1 {
   color: var(--customer-green);
   font-size: clamp(38px, 5vw, 58px);
+  overflow-wrap: anywhere;
 }
 
 .customer-lede {
@@ -716,6 +717,7 @@
   color: var(--customer-ink);
   font-size: 13px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .customer-appointment-date span,
@@ -1287,6 +1289,7 @@
 }
 
 .customer-skeleton-stat {
+  min-width: 0;
   height: 120px;
 }
 
@@ -1315,12 +1318,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .customer-skeleton-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .customer-next-card {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .customer-next-actions {
+    width: 100%;
     justify-content: flex-start;
   }
 
@@ -1365,7 +1373,6 @@
 
   .customer-reschedule-actions .customer-button {
     width: 100%;
-    margin-bottom: 25px;
   }
 
   .customer-cancel-panel {
@@ -1402,9 +1409,11 @@
   }
 
   .customer-history-tab {
+    min-width: 0;
     flex: 1;
     justify-content: center;
     padding: 0 6px;
+    text-align: center;
   }
 
   .customer-history-main {
@@ -1425,6 +1434,15 @@
     gap: 9px;
   }
 
+  .customer-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .customer-skeleton-stat:last-child {
+    grid-column: span 2;
+  }
+
   .customer-stat-card {
     padding: 14px;
   }
@@ -1441,6 +1459,7 @@
 
   .customer-appointment-service {
     grid-column: 1;
+    min-width: 0;
   }
 
   .customer-appointment-row .customer-status {
@@ -1450,7 +1469,13 @@
   }
 
   .customer-row-action {
-    display: none;
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    padding: 0 8px;
   }
 
   .customer-section-title-row {
@@ -1482,9 +1507,58 @@
     width: 100%;
   }
 
+  .customer-next-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
   .customer-next-actions .customer-button {
-    flex: 1;
-    padding-inline: 11px;
+    min-width: 0;
+    padding: 8px;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 360px) {
+  .customer-container {
+    width: calc(100% - 24px);
+  }
+
+  .customer-stat-card {
+    padding: 12px;
+  }
+
+  .customer-next-card {
+    padding: 18px;
+  }
+
+  .customer-next-card h2 {
+    font-size: 28px;
+  }
+
+  .customer-history-panel {
+    padding: 14px;
+  }
+
+  .customer-history-tab {
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .customer-history-tab span {
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  .customer-appointment-row {
+    gap: 8px;
+  }
+
+  .customer-appointment-row .customer-status {
+    max-width: 100%;
+    padding-inline: 6px;
+    font-size: 10px;
   }
 }
 

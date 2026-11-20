@@ -334,10 +334,7 @@ function AdminSettingsPage() {
     }
   };
 
-  const saveCredential = async (field) => {
-    const value = credentialValues[field.key];
-    if (!value) return;
-
+  const saveCredentialValues = async (values, successMessage) => {
     setSaving(true);
     setError("");
     setNotice("");
@@ -350,18 +347,46 @@ function AdminSettingsPage() {
       const payload = await requestSettings("/api/admin/settings", token, {
         method: "PUT",
         headers: { "X-Settings-Access-Token": settingsAccessToken },
-        body: JSON.stringify({ ...settingsPayload, [field.key]: value }),
+        body: JSON.stringify({ ...settingsPayload, ...values }),
       });
       setCredentials(payload.settings.secretsConfigured || {});
-      setCredentialValues((current) => ({ ...current, [field.key]: "" }));
+      setCredentialValues((current) => {
+        const nextValues = { ...current };
+        Object.keys(values).forEach((key) => delete nextValues[key]);
+        return nextValues;
+      });
       setEditingCredential(null);
-      setNotice(`${field.label} saved.`);
+      setNotice(successMessage);
     } catch (requestError) {
-      window.alert("Invalid credential");
       setError(requestError.message);
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveCredential = (field) => {
+    const value = credentialValues[field.key];
+    if (!value) return;
+    return saveCredentialValues(
+      { [field.key]: value },
+      `${field.label} saved.`,
+    );
+  };
+
+  const saveGoogleCredentials = () => {
+    const values = {
+      googleClientId: credentialValues.googleClientId || "",
+      googleClientSecret: credentialValues.googleClientSecret || "",
+    };
+    if (!values.googleClientId && !values.googleClientSecret) return;
+    if (
+      (!credentials.googleClientId || !credentials.googleClientSecret) &&
+      (!values.googleClientId || !values.googleClientSecret)
+    ) {
+      setError("Enter both the Google client ID and client secret.");
+      return;
+    }
+    return saveCredentialValues(values, "Google sign-in credentials saved.");
   };
 
   const restoreCredentials = async () => {
@@ -643,72 +668,118 @@ function AdminSettingsPage() {
                   <p>{group.description}</p>
                 </header>
                 <div className="admin-credential-group-fields">
-                  {group.fields.map((field) => (
-                    <div className="admin-credential-item" key={field.key}>
-                      <div className="admin-credential-summary">
-                        <div>
-                          <strong>{field.label}</strong>
-                          <span
-                            className={
-                              credentials[field.key] ? "is-configured" : ""
+                  {group.fields.map((field) => {
+                    const isGoogleCredentialPair =
+                      group.key === "google-auth" &&
+                      ["googleClientId", "googleClientSecret"].includes(
+                        field.key,
+                      );
+                    if (
+                      isGoogleCredentialPair &&
+                      field.key === "googleClientSecret"
+                    ) {
+                      return null;
+                    }
+
+                    const editorKey = isGoogleCredentialPair
+                      ? group.key
+                      : field.key;
+                    const editorFields = isGoogleCredentialPair
+                      ? group.fields.filter(({ key }) =>
+                          ["googleClientId", "googleClientSecret"].includes(
+                            key,
+                          ),
+                        )
+                      : [field];
+                    const isConfigured = isGoogleCredentialPair
+                      ? credentials.googleClientId &&
+                        credentials.googleClientSecret
+                      : credentials[field.key];
+
+                    return (
+                      <div className="admin-credential-item" key={field.key}>
+                        <div className="admin-credential-summary">
+                          <div>
+                            <strong>
+                              {isGoogleCredentialPair
+                                ? "Google client ID and secret"
+                                : field.label}
+                            </strong>
+                            <span className={isConfigured ? "is-configured" : ""}>
+                              {isConfigured ? "Configured" : "Not configured"}
+                            </span>
+                          </div>
+                          <button
+                            className="admin-credential-edit"
+                            type="button"
+                            aria-expanded={editingCredential === editorKey}
+                            aria-controls={`credential-editor-${editorKey}`}
+                            disabled={saving}
+                            onClick={() =>
+                              setEditingCredential((current) =>
+                                current === editorKey ? null : editorKey,
+                              )
                             }
                           >
-                            {credentials[field.key]
-                              ? "Configured"
-                              : "Not configured"}
-                          </span>
-                        </div>
-                        <button
-                          className="admin-credential-edit"
-                          type="button"
-                          aria-expanded={editingCredential === field.key}
-                          aria-controls={`credential-editor-${field.key}`}
-                          disabled={saving}
-                          onClick={() =>
-                            setEditingCredential((current) =>
-                              current === field.key ? null : field.key,
-                            )
-                          }
-                        >
-                          {editingCredential === field.key ? "Close" : "Edit"}
-                        </button>
-                      </div>
-                      {editingCredential === field.key && (
-                        <div
-                          className="admin-credential-editor"
-                          id={`credential-editor-${field.key}`}
-                        >
-                          <label className="admin-settings-field">
-                            <span>New value for {field.label}</span>
-                            <input
-                              type={field.type}
-                              value={credentialValues[field.key] || ""}
-                              placeholder={
-                                credentials[field.key]
-                                  ? "Enter a new value to replace the current one"
-                                  : "Enter a value"
-                              }
-                              autoComplete="new-password"
-                              onChange={(event) =>
-                                setCredentialValues((current) => ({
-                                  ...current,
-                                  [field.key]: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                          <button
-                            className="customer-button customer-button-primary"
-                            type="button"
-                            disabled={saving || !credentialValues[field.key]}
-                            onClick={() => saveCredential(field)}
-                          >
-                            Save {field.label}
+                            {editingCredential === editorKey ? "Close" : "Edit"}
                           </button>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {editingCredential === editorKey && (
+                          <div
+                            className="admin-credential-editor"
+                            id={`credential-editor-${editorKey}`}
+                          >
+                            {editorFields.map((editorField) => (
+                              <label
+                                className="admin-settings-field"
+                                key={editorField.key}
+                              >
+                                <span>New value for {editorField.label}</span>
+                                <input
+                                  type={editorField.type}
+                                  value={
+                                    credentialValues[editorField.key] || ""
+                                  }
+                                  placeholder={
+                                    credentials[editorField.key]
+                                      ? "Enter a new value to replace the current one"
+                                      : "Enter a value"
+                                  }
+                                  autoComplete="new-password"
+                                  onChange={(event) =>
+                                    setCredentialValues((current) => ({
+                                      ...current,
+                                      [editorField.key]: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                            ))}
+                            <button
+                              className="customer-button customer-button-primary"
+                              type="button"
+                              disabled={
+                                saving ||
+                                (isGoogleCredentialPair
+                                  ? !credentialValues.googleClientId &&
+                                    !credentialValues.googleClientSecret
+                                  : !credentialValues[field.key])
+                              }
+                              onClick={() =>
+                                isGoogleCredentialPair
+                                  ? saveGoogleCredentials()
+                                  : saveCredential(field)
+                              }
+                            >
+                              {isGoogleCredentialPair
+                                ? "Save Google credentials"
+                                : `Save ${field.label}`}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </article>
             ))}
