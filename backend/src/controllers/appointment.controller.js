@@ -594,103 +594,147 @@ export const listAppointments = async (req, res, next) => {
 
 export const assignAppointmentStaff = async (req, res, next) => {
   try {
-    const appointment = await Appointment.findById(req.params.id).populate(
+    const initialAppointment = await Appointment.findById(req.params.id).populate(
       "service",
       "name",
     );
-    if (!appointment) {
+    if (!initialAppointment) {
       return res.status(404).json({ message: "Appointment not found." });
     }
-    if (
-      ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(
-        appointment.status,
-      )
-    ) {
-      return res.status(400).json({
-        message: "Only pending or confirmed appointments can be assigned.",
+    const { staffId } = req.body;
+    const result = await withBookingDateLock(initialAppointment.date, async () => {
+      const appointment = await Appointment.findById(req.params.id).populate(
+        "service",
+        "name",
+      );
+      if (!appointment) {
+        return { status: 404, body: { message: "Appointment not found." } };
+      }
+      if (
+        appointment.date.toISOString().slice(0, 10) !==
+        initialAppointment.date.toISOString().slice(0, 10)
+      ) {
+        return {
+          status: 409,
+          body: {
+            message:
+              "This appointment changed while it was being assigned. Refresh and try again.",
+          },
+        };
+      }
+      if (
+        ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(
+          appointment.status,
+        )
+      ) {
+        return {
+          status: 400,
+          body: {
+            message: "Only pending or confirmed appointments can be assigned.",
+          },
+        };
+      }
+
+      const previousStaffId = appointment.staff
+        ? String(appointment.staff)
+        : "";
+      if (!staffId) {
+        appointment.staff = null;
+        await appointment.save();
+        return { appointment, removed: true };
+      }
+
+      const staff = await User.findOne({
+        _id: staffId,
+        role: { $in: ["staff", "manager", "admin"] },
+      }).select("name firstname lastname workingHours");
+      if (!staff) {
+        return { status: 404, body: { message: "Staff member not found." } };
+      }
+
+      const weekday = appointment.date.getUTCDay();
+      const workday = getStaffWorkingHours(staff).find(
+        (hours) => hours.weekday === weekday,
+      );
+      if (!workday || !workday.enabled) {
+        return {
+          status: 409,
+          body: {
+            message: "This staff member is not scheduled to work on that day.",
+          },
+        };
+      }
+      if (
+        appointment.startTime < workday.startTime ||
+        appointment.endTime > workday.endTime
+      ) {
+        return {
+          status: 409,
+          body: {
+            message:
+              "The appointment falls outside this staff member’s working hours.",
+          },
+        };
+      }
+
+      const overlappingAppointment = await Appointment.exists({
+        _id: { $ne: appointment._id },
+        staff: staff._id,
+        date: appointment.date,
+        status: {
+          $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED],
+        },
+        startTime: { $lt: appointment.endTime },
+        endTime: { $gt: appointment.startTime },
       });
+      if (overlappingAppointment) {
+        return {
+          status: 409,
+          body: {
+            message: "This staff member already has an appointment at that time.",
+          },
+        };
+      }
+
+      appointment.staff = staff._id;
+      await appointment.save();
+      return { appointment, previousStaffId, staff };
+    });
+
+    if (result.body) {
+      return res.status(result.status).json(result.body);
     }
 
-    const { staffId } = req.body;
-    const previousStaffId = appointment.staff ? String(appointment.staff) : "";
-    if (!staffId) {
-      appointment.staff = null;
-      await appointment.save();
-      try {
-        await syncAppointmentToGoogleCalendar(appointment);
-      } catch (error) {
-        console.error("Failed to sync staff removal to Google Calendar:", error.message);
-      }
+    const { appointment } = result;
+    try {
+      await syncAppointmentToGoogleCalendar(appointment);
+    } catch (error) {
+      console.error(
+        "Failed to sync staff assignment to Google Calendar:",
+        error.message,
+      );
+    }
+    if (result.removed) {
       return res.status(200).json({
         message: "Staff member removed from appointment.",
         staffId: null,
         staffName: null,
       });
     }
-
-    const staff = await User.findOne({
-      _id: staffId,
-      role: { $in: ["staff", "manager", "admin"] },
-    }).select("name firstname lastname workingHours");
-    if (!staff) {
-      return res.status(404).json({ message: "Staff member not found." });
-    }
-
-    const weekday = appointment.date.getUTCDay();
-    const workday = getStaffWorkingHours(staff).find(
-      (hours) => hours.weekday === weekday,
-    );
-    if (!workday || !workday.enabled) {
-      return res.status(409).json({
-        message: "This staff member is not scheduled to work on that day.",
-      });
-    }
-    if (
-      appointment.startTime < workday.startTime ||
-      appointment.endTime > workday.endTime
-    ) {
-      return res.status(409).json({
-        message: "The appointment falls outside this staff member’s working hours.",
-      });
-    }
-
-    const overlappingAppointment = await Appointment.exists({
-      _id: { $ne: appointment._id },
-      staff: staff._id,
-      date: appointment.date,
-      status: {
-        $in: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED],
-      },
-      startTime: { $lt: appointment.endTime },
-      endTime: { $gt: appointment.startTime },
-    });
-    if (overlappingAppointment) {
-      return res.status(409).json({
-        message: "This staff member already has an appointment at that time.",
-      });
-    }
-
-    appointment.staff = staff._id;
-    await appointment.save();
-    try {
-      await syncAppointmentToGoogleCalendar(appointment);
-    } catch (error) {
-      console.error("Failed to sync staff assignment to Google Calendar:", error.message);
-    }
-    if (previousStaffId !== String(staff._id)) {
+    if (result.previousStaffId !== String(result.staff._id)) {
       await notifyStaffOfAssignment({
         appointment,
-        staffId: staff._id,
+        staffId: result.staff._id,
         serviceName: appointment.service?.name,
       });
     }
     const staffName =
-      staff.name ||
-      [staff.firstname, staff.lastname].filter(Boolean).join(" ") ||
+      result.staff.name ||
+      [result.staff.firstname, result.staff.lastname].filter(Boolean).join(" ") ||
       "Staff member";
     return res.status(200).json({
       message: "Staff member assigned.",
-      staffId: String(staff._id),
+      staffId: String(result.staff._id),
       staffName,
     });
   } catch (error) {
