@@ -186,6 +186,24 @@
   color: #205638;
 }
 
+.admin-services__lock {
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #fdf1e2;
+  color: #8a5a14;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.admin-services__lock.is-mine {
+  background: #e7eef8;
+  color: #2c4f7c;
+}
+
+.admin-services__item.is-locked .admin-services__details {
+  opacity: 0.78;
+}
+
 .admin-services__archive {
   border: 1px solid #a33f37;
   background: #fff;

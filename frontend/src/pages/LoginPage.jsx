@@ -19,6 +19,9 @@ function validate(values) {
 }
 
 function LoginPage() {
+  const isRecaptchaConfigured = Boolean(
+    import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+  );
   const { login } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,13 +31,15 @@ function LoginPage() {
   const [success, setSuccess] = useState(location.state?.notice || "");
   const [loading, setLoading] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState(null);
+  const [recaptchaAttempt, setRecaptchaAttempt] = useState(0);
   const googleError = new URLSearchParams(location.search).get("google_error");
   const googleMessages = {
     disabled: "Google login is currently disabled.",
     customer_only: "Google login is available for customer accounts only.",
     exchange_failed: "Google login could not be completed.",
     profile_failed: "Google did not return a verified customer profile.",
-    account_conflict: "This Google account is already linked to another account.",
+    account_conflict:
+      "This Google account is already linked to another account.",
     server: "Google login could not be completed. Please try again.",
   };
   const errors = validate(values);
@@ -44,7 +49,6 @@ function LoginPage() {
       ...current,
       [event.target.name]: event.target.value,
     }));
-    setServerError("");
     setSuccess("");
   };
 
@@ -57,6 +61,10 @@ function LoginPage() {
     const nextErrors = validate(values);
     if (Object.keys(nextErrors).length) {
       document.getElementById(`login-${Object.keys(nextErrors)[0]}`)?.focus();
+      return;
+    }
+    if (isRecaptchaConfigured && !recaptchaToken) {
+      setServerError("Complete the security check and try again.");
       return;
     }
 
@@ -75,6 +83,8 @@ function LoginPage() {
       navigate(destination, { replace: true });
     } catch (error) {
       setServerError(error.message || "Invalid email or password.");
+      setRecaptchaToken(null);
+      setRecaptchaAttempt((attempt) => attempt + 1);
     } finally {
       setLoading(false);
     }
@@ -138,7 +148,7 @@ function LoginPage() {
           error={touched.password ? errors.password : ""}
         />
 
-        <RecaptchaWidget onChange={setRecaptchaToken} />
+        <RecaptchaWidget key={recaptchaAttempt} onChange={setRecaptchaToken} />
 
         <div className="auth-form-options">
           <label className="auth-check-label">

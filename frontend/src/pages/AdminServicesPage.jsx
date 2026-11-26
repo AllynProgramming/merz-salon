@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
@@ -6,7 +6,10 @@ import { formatPrice } from "../components/booking/bookingUtils.js";
 import {
   createService,
   getAdminServices,
+  getServiceEditLocks,
   archiveService,
+  lockServiceForEdit,
+  releaseServiceEditLock,
   restoreService,
   updateService,
 } from "../services/bookingApi.js";
@@ -24,23 +27,42 @@ const emptyForm = {
   category: "",
 };
 
+// Renew the edit lock well inside the server's 60 second lease.
+const LOCK_HEARTBEAT_MS = 20 * 1000;
+// How often to refresh which services other admins are editing.
+const LOCK_REFRESH_MS = 10 * 1000;
+
+const isLockConflict = (error) => error?.status === 423 || error?.status === 409;
+
 function AdminServicesPage() {
   const { token } = useAuth();
   const [services, setServices] = useState([]);
+  const [locks, setLocks] = useState({});
   const [serviceFilter, setServiceFilter] = useState("all");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
+  const [lockToken, setLockToken] = useState("");
+  const [openingId, setOpeningId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  // Latest edit session, for cleanup handlers that outlive a render.
+  const editSessionRef = useRef({ serviceId: "", lockToken: "", token });
+  useEffect(() => {
+    editSessionRef.current = { serviceId: editingId, lockToken, token };
+  }, [editingId, lockToken, token]);
+
   useEffect(() => {
     let active = true;
 
     getAdminServices(token)
-      .then((items) => {
-        if (active) setServices(items);
+      .then(({ services: items, locks: activeLocks }) => {
+        if (active) {
+          setServices(items);
+          setLocks(activeLocks);
+        }
       })
       .catch((requestError) => {
         if (active)
@@ -55,23 +77,139 @@ function AdminServicesPage() {
     };
   }, [token]);
 
-  const cancelEdit = () => {
+  const refreshLocks = useCallback(async () => {
+    try {
+      setLocks(
+        await getServiceEditLocks(token, editSessionRef.current.lockToken),
+      );
+    } catch {
+      // Lock badges are informative; the server still enforces the lock.
+    }
+  }, [token]);
+
+  // Keep the "being edited by" badges current.
+  useEffect(() => {
+    const interval = window.setInterval(refreshLocks, LOCK_REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshLocks();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshLocks]);
+
+  // Release the lock if the admin closes the tab or leaves the page.
+  useEffect(() => {
+    const release = () => {
+      const session = editSessionRef.current;
+      if (session.serviceId && session.lockToken) {
+        releaseServiceEditLock(
+          session.serviceId,
+          session.token,
+          session.lockToken,
+        );
+      }
+    };
+    window.addEventListener("pagehide", release);
+    return () => {
+      window.removeEventListener("pagehide", release);
+      release();
+    };
+  }, []);
+
+  const resetEditState = () => {
     setEditingId("");
+    setLockToken("");
     setForm(emptyForm);
   };
 
-  const beginEdit = (service) => {
-    setEditingId(service._id);
-    setForm({
-      name: service.name,
-      description: service.description || "",
-      price: service.price == null ? "" : String(service.price),
-      priceVaries: service.price == null,
-      durationMinutes: String(service.durationMinutes),
-      category: service.category || "",
-    });
+  const cancelEdit = () => {
+    const { serviceId, lockToken: currentToken } = editSessionRef.current;
+    if (serviceId && currentToken) {
+      releaseServiceEditLock(serviceId, token, currentToken).then(refreshLocks);
+    }
+    resetEditState();
+  };
+
+  const loseLock = useCallback(
+    (message) => {
+      setEditingId("");
+      setLockToken("");
+      setForm(emptyForm);
+      setNotice("");
+      setError(message);
+      refreshLocks();
+    },
+    [refreshLocks],
+  );
+
+  // Heartbeat: keep the lock alive while the edit form is open.
+  useEffect(() => {
+    if (!editingId || !lockToken) return undefined;
+
+    const interval = window.setInterval(async () => {
+      try {
+        await lockServiceForEdit(editingId, token, lockToken);
+      } catch (requestError) {
+        if (isLockConflict(requestError)) {
+          loseLock(
+            requestError.status === 423
+              ? requestError.message
+              : "Your editing session expired. Click Edit to continue.",
+          );
+        }
+      }
+    }, LOCK_HEARTBEAT_MS);
+
+    return () => window.clearInterval(interval);
+  }, [editingId, lockToken, token, loseLock]);
+
+  const beginEdit = async (service) => {
+    if (editingId === service._id) return;
+
     setError("");
     setNotice("");
+    setOpeningId(service._id);
+    try {
+      const { token: newLockToken, lock } = await lockServiceForEdit(
+        service._id,
+        token,
+      );
+
+      // Switching from another service: release the old lock first.
+      const previous = editSessionRef.current;
+      if (previous.serviceId && previous.lockToken) {
+        releaseServiceEditLock(previous.serviceId, token, previous.lockToken);
+      }
+
+      setEditingId(service._id);
+      setLockToken(newLockToken);
+      setLocks((current) => {
+        const next = { ...current, [service._id]: lock };
+        if (previous.serviceId) delete next[previous.serviceId];
+        return next;
+      });
+      setForm({
+        name: service.name,
+        description: service.description || "",
+        price: service.price == null ? "" : String(service.price),
+        priceVaries: service.price == null,
+        durationMinutes: String(service.durationMinutes),
+        category: service.category || "",
+      });
+    } catch (requestError) {
+      setError(requestError.message || "Could not open this service for editing.");
+      if (requestError.details?.lock) {
+        setLocks((current) => ({
+          ...current,
+          [service._id]: requestError.details.lock,
+        }));
+      }
+    } finally {
+      setOpeningId("");
+    }
   };
 
   const updateField = (event) => {
@@ -98,10 +236,22 @@ function AdminServicesPage() {
 
     try {
       if (editingId) {
-        const { service } = await updateService(editingId, serviceData, token);
+        const { service } = await updateService(
+          editingId,
+          serviceData,
+          token,
+          lockToken,
+        );
         setServices((current) =>
           current.map((item) => (item._id === editingId ? service : item)),
         );
+        // The server releases the lock after a successful save.
+        setLocks((current) => {
+          const next = { ...current };
+          delete next[editingId];
+          return next;
+        });
+        resetEditState();
         setNotice("Service updated.");
       } else {
         const { service } = await createService(serviceData, token);
@@ -110,11 +260,15 @@ function AdminServicesPage() {
             first.name.localeCompare(second.name),
           ),
         );
+        resetEditState();
         setNotice("Service added.");
       }
-      cancelEdit();
     } catch (requestError) {
-      setError(requestError.message || "Could not save this service.");
+      if (editingId && isLockConflict(requestError)) {
+        loseLock(requestError.message);
+      } else {
+        setError(requestError.message || "Could not save this service.");
+      }
     } finally {
       setSaving(false);
     }
@@ -130,10 +284,12 @@ function AdminServicesPage() {
 
     setError("");
     setNotice("");
+    const ownLockToken = editingId === service._id ? lockToken : "";
     try {
       const { service: archivedService } = await archiveService(
         service._id,
         token,
+        ownLockToken,
       );
       setServices((current) =>
         current.map((item) =>
@@ -146,16 +302,19 @@ function AdminServicesPage() {
       );
     } catch (requestError) {
       setError(requestError.message || "Could not archive this service.");
+      if (isLockConflict(requestError)) refreshLocks();
     }
   };
 
   const restore = async (service) => {
     setError("");
     setNotice("");
+    const ownLockToken = editingId === service._id ? lockToken : "";
     try {
       const { service: restoredService } = await restoreService(
         service._id,
         token,
+        ownLockToken,
       );
       setServices((current) =>
         current.map((item) =>
@@ -165,6 +324,7 @@ function AdminServicesPage() {
       setNotice(`${service.name} was restored to the service menu.`);
     } catch (requestError) {
       setError(requestError.message || "Could not restore this service.");
+      if (isLockConflict(requestError)) refreshLocks();
     }
   };
 
@@ -348,9 +508,13 @@ function AdminServicesPage() {
             </p>
           ) : (
             <div className="admin-services__list">
-              {filteredServices.map((service) => (
+              {filteredServices.map((service) => {
+                const lock = locks[service._id];
+                const isMine = editingId === service._id;
+                const lockedByOther = Boolean(lock) && !isMine;
+                return (
                 <article
-                  className={`admin-services__item${service.isActive ? "" : " is-archived"}`}
+                  className={`admin-services__item${service.isActive ? "" : " is-archived"}${lockedByOther ? " is-locked" : ""}`}
                   key={service._id}
                 >
                   <div className="admin-services__details">
@@ -361,6 +525,21 @@ function AdminServicesPage() {
                       >
                         {service.isActive ? "Available" : "Archived"}
                       </span>
+                      {isMine && (
+                        <span className="admin-services__lock is-mine">
+                          You are editing
+                        </span>
+                      )}
+                      {lockedByOther && (
+                        <span
+                          className="admin-services__lock"
+                          title="This service is locked while another admin edits it."
+                        >
+                          {lock.isMine === false && lock.holderName
+                            ? `Being edited by ${lock.holderName}`
+                            : "Being edited"}
+                        </span>
+                      )}
                     </div>
                     <p>
                       {service.category || "Uncategorized"} ·{" "}
@@ -373,14 +552,16 @@ function AdminServicesPage() {
                       className="customer-button customer-button-outline"
                       type="button"
                       onClick={() => beginEdit(service)}
+                      disabled={lockedByOther || isMine || openingId === service._id}
                     >
-                      Edit
+                      {openingId === service._id ? "Opening…" : "Edit"}
                     </button>
                     {service.isActive ? (
                       <button
                         className="customer-button admin-services__archive"
                         type="button"
                         onClick={() => archive(service)}
+                        disabled={lockedByOther}
                       >
                         Archive
                       </button>
@@ -389,13 +570,15 @@ function AdminServicesPage() {
                         className="customer-button customer-button-primary"
                         type="button"
                         onClick={() => restore(service)}
+                        disabled={lockedByOther}
                       >
                         Restore
                       </button>
                     )}
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

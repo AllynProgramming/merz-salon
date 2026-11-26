@@ -229,9 +229,50 @@ export async function getService(serviceId) {
   return payload.service || payload;
 }
 
-export async function getAdminServices(token) {
-  const payload = await request("/api/services/admin", { token });
-  return payload.services || [];
+const EDIT_LOCK_HEADER = "X-Edit-Lock-Token";
+const lockHeaders = (lockToken) =>
+  lockToken ? { [EDIT_LOCK_HEADER]: lockToken } : {};
+
+export async function getAdminServices(token, lockToken) {
+  const payload = await request("/api/services/admin", {
+    token,
+    headers: lockHeaders(lockToken),
+  });
+  return { services: payload.services || [], locks: payload.locks || {} };
+}
+
+export async function getServiceEditLocks(token, lockToken) {
+  const payload = await request("/api/services/admin/locks", {
+    token,
+    headers: lockHeaders(lockToken),
+  });
+  return payload.locks || {};
+}
+
+// Start editing a service (no lockToken) or renew the lock you hold.
+// Rejects with status 423 when another admin is editing it.
+export async function lockServiceForEdit(serviceId, token, lockToken) {
+  return request(`/api/services/${encodeURIComponent(serviceId)}/lock`, {
+    method: "POST",
+    token,
+    headers: lockHeaders(lockToken),
+  });
+}
+
+// keepalive lets the release finish even while the page is closing.
+export async function releaseServiceEditLock(serviceId, token, lockToken) {
+  if (!lockToken) return;
+  await fetch(
+    `${API_BASE_URL}/api/services/${encodeURIComponent(serviceId)}/lock`,
+    {
+      method: "DELETE",
+      keepalive: true,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...lockHeaders(lockToken),
+      },
+    },
+  ).catch(() => {});
 }
 
 export async function createService(service, token) {
@@ -244,32 +285,34 @@ export async function createService(service, token) {
   return payload;
 }
 
-export async function updateService(serviceId, service, token) {
+export async function updateService(serviceId, service, token, lockToken) {
   const payload = await request(`/api/services/${encodeURIComponent(serviceId)}`, {
     method: "PUT",
     token,
+    headers: lockHeaders(lockToken),
     body: JSON.stringify(service),
   });
   syncCachedServices(payload);
   return payload;
 }
 
-export async function archiveService(serviceId, token) {
+export async function archiveService(serviceId, token, lockToken) {
   const payload = await request(
     `/api/services/${encodeURIComponent(serviceId)}/archive`,
     {
       method: "PATCH",
       token,
+      headers: lockHeaders(lockToken),
     },
   );
   syncCachedServices(payload);
   return payload;
 }
 
-export async function restoreService(serviceId, token) {
+export async function restoreService(serviceId, token, lockToken) {
   const payload = await request(
     `/api/services/${encodeURIComponent(serviceId)}/restore`,
-    { method: "PATCH", token },
+    { method: "PATCH", token, headers: lockHeaders(lockToken) },
   );
   syncCachedServices(payload);
   return payload;
