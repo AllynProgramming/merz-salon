@@ -216,7 +216,7 @@ export async function getServices({ category = "", search = "", limit } = {}) {
   if (search.trim()) params.set("search", search.trim());
   if (limit) params.set("limit", String(limit));
   const suffix = params.size ? `?${params}` : "";
-  const payload = await request(`/api/services${suffix}`);
+  const payload = await request(`/api/v1/services${suffix}`);
   const services = Array.isArray(payload) ? payload : payload.services || [];
   syncCachedServices(services);
   return services;
@@ -224,7 +224,7 @@ export async function getServices({ category = "", search = "", limit } = {}) {
 
 export async function getService(serviceId) {
   const payload = await request(
-    `/api/services/${encodeURIComponent(serviceId)}`,
+    `/api/v1/services/${encodeURIComponent(serviceId)}`,
   );
   return payload.service || payload;
 }
@@ -234,7 +234,7 @@ const lockHeaders = (lockToken) =>
   lockToken ? { [EDIT_LOCK_HEADER]: lockToken } : {};
 
 export async function getAdminServices(token, lockToken) {
-  const payload = await request("/api/services/admin", {
+  const payload = await request("/api/v1/services/admin", {
     token,
     headers: lockHeaders(lockToken),
   });
@@ -242,7 +242,7 @@ export async function getAdminServices(token, lockToken) {
 }
 
 export async function getServiceEditLocks(token, lockToken) {
-  const payload = await request("/api/services/admin/locks", {
+  const payload = await request("/api/v1/services/admin/locks", {
     token,
     headers: lockHeaders(lockToken),
   });
@@ -252,7 +252,7 @@ export async function getServiceEditLocks(token, lockToken) {
 // Start editing a service (no lockToken) or renew the lock you hold.
 // Rejects with status 423 when another admin is editing it.
 export async function lockServiceForEdit(serviceId, token, lockToken) {
-  return request(`/api/services/${encodeURIComponent(serviceId)}/lock`, {
+  return request(`/api/v1/services/${encodeURIComponent(serviceId)}/lock`, {
     method: "POST",
     token,
     headers: lockHeaders(lockToken),
@@ -263,7 +263,7 @@ export async function lockServiceForEdit(serviceId, token, lockToken) {
 export async function releaseServiceEditLock(serviceId, token, lockToken) {
   if (!lockToken) return;
   await fetch(
-    `${API_BASE_URL}/api/services/${encodeURIComponent(serviceId)}/lock`,
+    `${API_BASE_URL}/api/v1/services/${encodeURIComponent(serviceId)}/lock`,
     {
       method: "DELETE",
       keepalive: true,
@@ -276,7 +276,7 @@ export async function releaseServiceEditLock(serviceId, token, lockToken) {
 }
 
 export async function createService(service, token) {
-  const payload = await request("/api/services", {
+  const payload = await request("/api/v1/services", {
     method: "POST",
     token,
     body: JSON.stringify(service),
@@ -286,7 +286,7 @@ export async function createService(service, token) {
 }
 
 export async function updateService(serviceId, service, token, lockToken) {
-  const payload = await request(`/api/services/${encodeURIComponent(serviceId)}`, {
+  const payload = await request(`/api/v1/services/${encodeURIComponent(serviceId)}`, {
     method: "PUT",
     token,
     headers: lockHeaders(lockToken),
@@ -298,7 +298,7 @@ export async function updateService(serviceId, service, token, lockToken) {
 
 export async function archiveService(serviceId, token, lockToken) {
   const payload = await request(
-    `/api/services/${encodeURIComponent(serviceId)}/archive`,
+    `/api/v1/services/${encodeURIComponent(serviceId)}/archive`,
     {
       method: "PATCH",
       token,
@@ -311,7 +311,7 @@ export async function archiveService(serviceId, token, lockToken) {
 
 export async function restoreService(serviceId, token, lockToken) {
   const payload = await request(
-    `/api/services/${encodeURIComponent(serviceId)}/restore`,
+    `/api/v1/services/${encodeURIComponent(serviceId)}/restore`,
     { method: "PATCH", token, headers: lockHeaders(lockToken) },
   );
   syncCachedServices(payload);
@@ -321,7 +321,7 @@ export async function restoreService(serviceId, token, lockToken) {
 export async function searchBookingCustomers(search, token) {
   const params = new URLSearchParams({ search });
   const payload = await request(
-    `/api/staff/appointments/customers?${params}`,
+    `/api/v1/staff/appointments/customers?${params}`,
     { token },
   );
   return payload.customers || [];
@@ -337,7 +337,7 @@ export async function getStaffAvailability({
   if (excludeAppointmentId) {
     params.set("excludeAppointmentId", excludeAppointmentId);
   }
-  return request(`/api/staff/appointments/availability?${params}`, { token });
+  return request(`/api/v1/staff/appointments/availability?${params}`, { token });
 }
 
 export async function getStaffAvailabilityCalendar({
@@ -348,13 +348,13 @@ export async function getStaffAvailabilityCalendar({
 }) {
   const params = new URLSearchParams({ serviceId, from, to });
   return request(
-    `/api/staff/appointments/availability/calendar?${params}`,
+    `/api/v1/staff/appointments/availability/calendar?${params}`,
     { token },
   );
 }
 
 export async function createStaffAppointment(details, token) {
-  return request("/api/staff/appointments", {
+  return request("/api/v1/staff/appointments", {
     method: "POST",
     token,
     body: JSON.stringify(details),
@@ -363,14 +363,14 @@ export async function createStaffAppointment(details, token) {
 
 export async function getStaffAppointment(appointmentId, token) {
   return request(
-    `/api/staff/appointments/${encodeURIComponent(appointmentId)}`,
+    `/api/v1/staff/appointments/${encodeURIComponent(appointmentId)}`,
     { token },
   );
 }
 
 export async function cancelStaffAppointment(appointmentId, token) {
   return request(
-    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    `/api/v1/staff/appointments/${encodeURIComponent(appointmentId)}/cancel`,
     {
       method: "PATCH",
       token,
@@ -380,7 +380,7 @@ export async function cancelStaffAppointment(appointmentId, token) {
 
 export async function confirmStaffAppointment(appointmentId, token) {
   return request(
-    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/confirm`,
+    `/api/v1/staff/appointments/${encodeURIComponent(appointmentId)}/confirm`,
     {
       method: "PATCH",
       token,
@@ -393,7 +393,7 @@ export async function rescheduleStaffAppointment(
   { date, startTime, token },
 ) {
   return request(
-    `/api/staff/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+    `/api/v1/staff/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
     {
       method: "PATCH",
       token,
@@ -412,7 +412,7 @@ export async function getAvailability({
     const params = new URLSearchParams({ serviceId, date });
     if (excludeAppointmentId)
       params.set("excludeAppointmentId", excludeAppointmentId);
-    return request(`/api/appointments/availability?${params}`, { token });
+    return request(`/api/v1/appointments/availability?${params}`, { token });
   }
 
   await delay();
@@ -422,7 +422,7 @@ export async function getAvailability({
 export async function getAvailabilityCalendar({ serviceId, from, to, token }) {
   if (!USE_MOCK_APPOINTMENT_API) {
     const params = new URLSearchParams({ serviceId, from, to });
-    return request(`/api/appointments/availability/calendar?${params}`, {
+    return request(`/api/v1/appointments/availability/calendar?${params}`, {
       token,
     });
   }
@@ -461,7 +461,7 @@ export async function createAppointment({
   token,
 }) {
   if (!USE_MOCK_APPOINTMENT_API) {
-    return request("/api/appointments", {
+    return request("/api/v1/appointments", {
       method: "POST",
       token,
       body: JSON.stringify({ serviceId, date, startTime, ...(staffId ? { staffId } : {}) }),
@@ -507,7 +507,7 @@ export async function createAppointment({
 export async function getAppointment(appointmentId, token) {
   if (!USE_MOCK_APPOINTMENT_API) {
     const payload = await request(
-      `/api/appointments/${encodeURIComponent(appointmentId)}`,
+      `/api/v1/appointments/${encodeURIComponent(appointmentId)}`,
       { token },
     );
     return payload.appointment || payload;
@@ -527,7 +527,7 @@ export async function rescheduleAppointment(
 ) {
   if (!USE_MOCK_APPOINTMENT_API) {
     const payload = await request(
-      `/api/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+      `/api/v1/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
       {
         method: "PUT",
         token,
@@ -585,7 +585,7 @@ export async function rescheduleAppointment(
 export async function cancelAppointment(appointmentId, token) {
   if (!USE_MOCK_APPOINTMENT_API) {
     const payload = await request(
-      `/api/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+      `/api/v1/appointments/${encodeURIComponent(appointmentId)}/cancel`,
       {
         method: "PATCH",
         token,
@@ -639,7 +639,7 @@ export async function getAppointments({
     if (page) params.set("page", String(page));
     if (limit) params.set("limit", String(limit));
     const suffix = params.size ? `?${params}` : "";
-    return request(`/api/appointments${suffix}`, { token });
+    return request(`/api/v1/appointments${suffix}`, { token });
   }
 
   await delay();
@@ -720,7 +720,7 @@ export async function updateAppointmentFeedback({
   token,
 }) {
   if (!USE_MOCK_APPOINTMENT_API) {
-    return request(`/api/feedback/${encodeURIComponent(feedbackId)}`, {
+    return request(`/api/v1/feedback/${encodeURIComponent(feedbackId)}`, {
       method: "PUT",
       token,
       body: JSON.stringify({ rating, comment }),
@@ -753,7 +753,7 @@ export async function submitAppointmentFeedback({
   token,
 }) {
   if (!USE_MOCK_APPOINTMENT_API) {
-    return request("/api/feedback", {
+    return request("/api/v1/feedback", {
       method: "POST",
       token,
       body: JSON.stringify({ appointmentId, rating, comment }),
@@ -790,7 +790,7 @@ export async function submitAppointmentFeedback({
 
 export async function getDashboardOverview(token) {
   if (!USE_MOCK_APPOINTMENT_API) {
-    return request("/api/dashboard", { token });
+    return request("/api/v1/dashboard", { token });
   }
 
   await delay();

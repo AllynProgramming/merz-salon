@@ -32,8 +32,8 @@ function StaffNotificationBell() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [notificationResponse, countResponse] = await Promise.all([
-        fetch("/api/notifications?limit=20", { headers }),
-        fetch("/api/notifications/unread-count", { headers }),
+        fetch("/api/v1/notifications?limit=20", { headers }),
+        fetch("/api/v1/notifications/unread-count", { headers }),
       ]);
       const [notificationData, countData] = await Promise.all([
         readJson(notificationResponse),
@@ -93,7 +93,7 @@ function StaffNotificationBell() {
     try {
       if (!notification.isRead) {
         await readJson(
-          await fetch(`/api/notifications/${notification._id}/read`, {
+          await fetch(`/api/v1/notifications/${notification._id}/read`, {
             method: "PATCH",
             headers: { Authorization: `Bearer ${token}` },
           }),

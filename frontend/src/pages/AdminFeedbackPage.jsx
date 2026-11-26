@@ -63,7 +63,7 @@ function AdminFeedbackPage() {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/feedback/admin", {
+        const response = await fetch("/api/v1/feedback/admin", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const payload = await response.json().catch(() => ({}));

@@ -57,7 +57,7 @@ async function fetchAppointments(token, from, to) {
       page: String(page),
       limit: "50",
     });
-    const response = await fetch(`/api/staff/appointments?${query}`, {
+    const response = await fetch(`/api/v1/staff/appointments?${query}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const payload = await response.json().catch(() => ({}));
@@ -80,7 +80,7 @@ async function fetchAppointments(token, from, to) {
 
 async function fetchGoogleCalendarEvents(token, timeMin, timeMax) {
   const query = new URLSearchParams({ timeMin, timeMax });
-  const response = await fetch(`/api/admin/calendar/events?${query}`, {
+  const response = await fetch(`/api/v1/admin/calendar/events?${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const payload = await response.json().catch(() => ({}));
@@ -143,7 +143,7 @@ function workingHoursForStaff(member) {
 }
 
 async function fetchStaff(token) {
-  const response = await fetch("/api/admin/staff", {
+  const response = await fetch("/api/v1/admin/staff", {
     headers: { Authorization: ["Bearer", token].join(" ") },
   });
   const payload = await response.json().catch(() => ({}));
@@ -219,7 +219,7 @@ function AdminSchedulePage() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/settings/integrations")
+    fetch("/api/v1/settings/integrations")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (active) {
@@ -382,7 +382,7 @@ function AdminSchedulePage() {
 
     try {
       const response = await fetch(
-        `/api/staff/appointments/${appointmentId}/confirm`,
+        `/api/v1/staff/appointments/${appointmentId}/confirm`,
         {
           method: "PATCH",
           headers: {
@@ -438,7 +438,7 @@ function AdminSchedulePage() {
     setError("");
     try {
       const response = await fetch(
-        `/api/staff/appointments/${appointmentId}/assign`,
+        `/api/v1/staff/appointments/${appointmentId}/assign`,
         {
           method: "PATCH",
           headers: {
@@ -496,7 +496,7 @@ function AdminSchedulePage() {
     setHoursSaved(false);
     try {
       const response = await fetch(
-        `/api/admin/staff/${selectedStaffId}/working-hours`,
+        `/api/v1/admin/staff/${selectedStaffId}/working-hours`,
         {
           method: "PUT",
           headers: {

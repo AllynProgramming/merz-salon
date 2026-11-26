@@ -28,7 +28,7 @@ const getGoogleConfig = async () => {
     redirectUri:
       process.env.GOOGLE_CALENDAR_REDIRECT_URI ||
       secrets.googleCalendarRedirectUri ||
-      "http://localhost:3000/api/admin/calendar/callback",
+      "http://localhost:3000/api/v1/admin/calendar/callback",
   };
 };
 

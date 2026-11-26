@@ -105,7 +105,7 @@ function LoginPage() {
           className="auth-button-secondary"
           type="button"
           onClick={() => {
-            window.location.href = "/api/auth/google";
+            window.location.href = "/api/v1/auth/google";
           }}
         >
           Continue with Google

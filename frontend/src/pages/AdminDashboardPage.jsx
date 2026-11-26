@@ -33,7 +33,7 @@ async function fetchTodayAppointments(token, date) {
       page: String(page),
       limit: "50",
     });
-    const response = await fetch(`/api/staff/appointments?${query}`, {
+    const response = await fetch(`/api/v1/staff/appointments?${query}`, {
       headers: { Authorization: ["Bearer", token].join(" ") },
     });
     const payload = await response.json().catch(() => ({}));
@@ -72,7 +72,7 @@ function AdminDashboardPage() {
 
     async function loadAppointments() {
       try {
-        const response = await fetch("/api/staff/appointments?limit=1", {
+        const response = await fetch("/api/v1/staff/appointments?limit=1", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const payload = await response.json().catch(() => ({}));

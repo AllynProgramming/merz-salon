@@ -18,7 +18,7 @@ const getConfig = async () => {
       secrets.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET,
     redirectUri:
       process.env.GOOGLE_DRIVE_REDIRECT_URI ||
-      "http://localhost:3000/api/admin/reports/drive/callback",
+      "http://localhost:3000/api/v1/admin/reports/drive/callback",
   };
 };
 

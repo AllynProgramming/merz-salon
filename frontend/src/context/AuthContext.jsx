@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const response = await authRequest("/api/users/me", { token });
+        const response = await authRequest("/api/v1/users/me", { token });
         if (active) setUser(response.user);
       } catch (error) {
         if (error.status === 401) {
@@ -117,7 +117,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (details) => {
-    const response = await authRequest("/api/auth/register", {
+    const response = await authRequest("/api/v1/auth/register", {
       method: "POST",
       body: JSON.stringify(details),
     });
@@ -126,7 +126,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (credentials, recaptchaToken) => {
-    const response = await authRequest("/api/auth/login", {
+    const response = await authRequest("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({ ...credentials, recaptchaToken }),
     });
@@ -138,7 +138,7 @@ export function AuthProvider({ children }) {
     clearSettingsAccess();
     localStorage.setItem(TOKEN_KEY, authToken);
     setToken(authToken);
-    const response = await authRequest("/api/users/me", { token: authToken });
+    const response = await authRequest("/api/v1/users/me", { token: authToken });
     setUser(response.user);
     setAuthNotice("");
     return response.user;
@@ -148,7 +148,7 @@ export function AuthProvider({ children }) {
     const activeToken = token;
     try {
       if (activeToken) {
-        await authRequest("/api/auth/logout", {
+        await authRequest("/api/v1/auth/logout", {
           method: "POST",
           token: activeToken,
         });
@@ -163,7 +163,7 @@ export function AuthProvider({ children }) {
   };
 
   const updateProfile = async (profile) => {
-    const response = await authRequest("/api/users/me", {
+    const response = await authRequest("/api/v1/users/me", {
       method: "PUT",
       token,
       body: JSON.stringify(profile),
@@ -173,7 +173,7 @@ export function AuthProvider({ children }) {
   };
 
   const changePassword = async (passwords) => {
-    const response = await authRequest("/api/users/me/password", {
+    const response = await authRequest("/api/v1/users/me/password", {
       method: "PUT",
       token,
       body: JSON.stringify(passwords),
@@ -184,7 +184,7 @@ export function AuthProvider({ children }) {
     return response;
   };
 
-  const getDashboard = async () => authRequest("/api/dashboard", { token });
+  const getDashboard = async () => authRequest("/api/v1/dashboard", { token });
 
   return (
     <AuthContext.Provider

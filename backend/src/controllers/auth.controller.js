@@ -199,7 +199,7 @@ const getGoogleConfig = async () => {
     redirectUri:
       secrets.googleOauthRedirectUri ||
       process.env.GOOGLE_OAUTH_REDIRECT_URI ||
-      "http://localhost:3000/api/auth/google/callback",
+      "http://localhost:3000/api/v1/auth/google/callback",
   };
 };
 

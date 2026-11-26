@@ -70,7 +70,7 @@ function AdminStaffPage() {
   useEffect(() => {
     let active = true;
 
-    requestStaff("/api/admin/staff", token)
+    requestStaff("/api/v1/admin/staff", token)
       .then((payload) => {
         if (active) setStaff(payload.staff || []);
       })
@@ -106,7 +106,7 @@ function AdminStaffPage() {
 
     setSaving(true);
     try {
-      const payload = await requestStaff("/api/admin/staff", token, {
+      const payload = await requestStaff("/api/v1/admin/staff", token, {
         method: "POST",
         body: JSON.stringify({
           name: form.name.trim(),
@@ -152,7 +152,7 @@ function AdminStaffPage() {
     setNotice("");
     try {
       const payload = await requestStaff(
-        `/api/admin/staff/${encodeURIComponent(editingId)}`,
+        `/api/v1/admin/staff/${encodeURIComponent(editingId)}`,
         token,
         {
           method: "PUT",
@@ -184,7 +184,7 @@ function AdminStaffPage() {
     setNotice("");
     try {
       const payload = await requestStaff(
-        `/api/admin/staff/${encodeURIComponent(member._id)}`,
+        `/api/v1/admin/staff/${encodeURIComponent(member._id)}`,
         token,
         {
           method: "PUT",

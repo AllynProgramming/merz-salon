@@ -112,7 +112,7 @@ export const listServiceLocks = async (req, res, next) => {
   }
 };
 
-// POST /api/services/:id/lock: start editing, or renew (heartbeat) when the
+// POST /api/v1/services/:id/lock: start editing, or renew (heartbeat) when the
 // caller sends its current token in the X-Edit-Lock-Token header.
 export const lockService = async (req, res, next) => {
   try {
@@ -136,7 +136,7 @@ export const lockService = async (req, res, next) => {
   }
 };
 
-// DELETE /api/services/:id/lock: stop editing. Only the holder's token can
+// DELETE /api/v1/services/:id/lock: stop editing. Only the holder's token can
 // release it.
 export const unlockService = async (req, res, next) => {
   try {

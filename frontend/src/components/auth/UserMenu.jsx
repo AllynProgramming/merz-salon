@@ -33,12 +33,12 @@ function UserMenu() {
     setLoadingNotifications(true);
     try {
       const [notificationResponse, countResponse] = await Promise.all([
-        fetch("/api/notifications?limit=5", {
+        fetch("/api/v1/notifications?limit=5", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }),
-        fetch("/api/notifications/unread-count", {
+        fetch("/api/v1/notifications/unread-count", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -136,7 +136,7 @@ function UserMenu() {
     if (!token || !notificationId) return;
 
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, {
+      await fetch(`/api/v1/notifications/${notificationId}/read`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -167,7 +167,7 @@ function UserMenu() {
     if (!token) return;
 
     try {
-      await fetch("/api/notifications/read-all", {
+      await fetch("/api/v1/notifications/read-all", {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -11,7 +11,7 @@ function Location() {
   const [embeddedMaps, setEmbeddedMaps] = useState(true);
 
   useEffect(() => {
-    fetch("/api/settings/integrations")
+    fetch("/api/v1/settings/integrations")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (payload) setEmbeddedMaps(payload.embeddedMaps !== false);

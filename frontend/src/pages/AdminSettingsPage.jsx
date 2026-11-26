@@ -25,7 +25,7 @@ const calendarErrorMessages = {
   authorization_denied:
     "Google Calendar connection was cancelled or denied. Please try again and allow calendar access.",
   redirect_uri_mismatch:
-    "Google rejected the callback address. Check that the Google OAuth redirect URI is exactly http://localhost:3000/api/admin/calendar/callback.",
+    "Google rejected the callback address. Check that the Google OAuth redirect URI is exactly http://localhost:3000/api/v1/admin/calendar/callback.",
   refresh_token_missing:
     "Google did not return a refresh token. Reconnect and approve calendar access again.",
   oauth_credentials_rejected:
@@ -218,7 +218,7 @@ function AdminSettingsPage() {
     setAccessError("");
     try {
       const payload = await requestSettings(
-        "/api/admin/settings/access/request",
+        "/api/v1/admin/settings/access/request",
         token,
         { method: "POST", body: JSON.stringify({ superPin }) },
       );
@@ -237,7 +237,7 @@ function AdminSettingsPage() {
     setAccessError("");
     try {
       const payload = await requestSettings(
-        "/api/admin/settings/access/verify",
+        "/api/v1/admin/settings/access/verify",
         token,
         { method: "POST", body: JSON.stringify({ challengeToken, otp }) },
       );
@@ -262,7 +262,7 @@ function AdminSettingsPage() {
     if (!settingsAccessToken) {
       return undefined;
     }
-    requestSettings("/api/admin/settings", token, {
+    requestSettings("/api/v1/admin/settings", token, {
       headers: { "X-Settings-Access-Token": settingsAccessToken },
     })
       .then((payload) => {
@@ -306,7 +306,7 @@ function AdminSettingsPage() {
           ([field]) => !isConnectionMetadata(field),
         ),
       );
-      const payload = await requestSettings("/api/admin/settings", token, {
+      const payload = await requestSettings("/api/v1/admin/settings", token, {
         method: "PUT",
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify(settingsPayload),
@@ -344,7 +344,7 @@ function AdminSettingsPage() {
           ([key]) => !isConnectionMetadata(key),
         ),
       );
-      const payload = await requestSettings("/api/admin/settings", token, {
+      const payload = await requestSettings("/api/v1/admin/settings", token, {
         method: "PUT",
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, ...values }),
@@ -399,7 +399,7 @@ function AdminSettingsPage() {
           ([key]) => !isConnectionMetadata(key),
         ),
       );
-      const payload = await requestSettings("/api/admin/settings", token, {
+      const payload = await requestSettings("/api/v1/admin/settings", token, {
         method: "PUT",
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, resetCredentials: true }),
@@ -587,8 +587,8 @@ function AdminSettingsPage() {
                           try {
                             const response = await fetch(
                               item.key === "googleCalendar"
-                                ? "/api/admin/calendar/connect"
-                                : "/api/admin/settings/drive/connect",
+                                ? "/api/v1/admin/calendar/connect"
+                                : "/api/v1/admin/settings/drive/connect",
                               {
                                 headers: {
                                   Accept: "application/json",

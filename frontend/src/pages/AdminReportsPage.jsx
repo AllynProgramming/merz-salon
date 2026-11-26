@@ -42,7 +42,7 @@ function AdminReportsPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch("/api/admin/reports/drive/status", {
+    fetch("/api/v1/admin/reports/drive/status", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((response) => response.json())
@@ -54,7 +54,7 @@ function AdminReportsPage() {
     setDriveBusy(true);
     setDriveMessage("");
     try {
-      const response = await fetch(`/api/admin/reports/pdf?${reportQuery()}`, {
+      const response = await fetch(`/api/v1/admin/reports/pdf?${reportQuery()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Could not create the PDF report.");
@@ -88,7 +88,7 @@ function AdminReportsPage() {
 
   const connectDrive = async () => {
     try {
-      const response = await fetch("/api/admin/reports/drive/connect", {
+      const response = await fetch("/api/v1/admin/reports/drive/connect", {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
@@ -106,7 +106,7 @@ function AdminReportsPage() {
     setDriveBusy(true);
     setDriveMessage("");
     try {
-      const response = await fetch(`/api/admin/reports/drive/upload?${reportQuery()}`, {
+      const response = await fetch(`/api/v1/admin/reports/drive/upload?${reportQuery()}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -127,7 +127,7 @@ function AdminReportsPage() {
       setError("");
       try {
         const query = new URLSearchParams({ from, to });
-        const response = await fetch(`/api/admin/reports?${query}`, {
+        const response = await fetch(`/api/v1/admin/reports?${query}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const payload = await response.json().catch(() => ({}));

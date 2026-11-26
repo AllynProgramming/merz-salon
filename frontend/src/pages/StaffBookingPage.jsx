@@ -329,7 +329,7 @@ function StaffBookingPage() {
     setReminderTestMessage("");
     setError("");
     try {
-      const response = await fetch("/api/staff/appointments/test-reminders", {
+      const response = await fetch("/api/v1/staff/appointments/test-reminders", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
