@@ -27,12 +27,31 @@ const emptyForm = {
   category: "",
 };
 
-// Renew the edit lock well inside the server's 60 second lease.
+// Renew your place well inside the server's 60 second lease. While waiting
+// behind another admin, check more often so Save unlocks soon after they
+// finish.
 const LOCK_HEARTBEAT_MS = 20 * 1000;
+const LOCK_WAITING_HEARTBEAT_MS = 5 * 1000;
 // How often to refresh which services other admins are editing.
 const LOCK_REFRESH_MS = 10 * 1000;
 
 const isLockConflict = (error) => error?.status === 423 || error?.status === 409;
+
+const formatOpenedAt = (value) =>
+  value
+    ? new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(
+        new Date(value),
+      )
+    : "";
+
+const toForm = (service) => ({
+  name: service.name,
+  description: service.description || "",
+  price: service.price == null ? "" : String(service.price),
+  priceVaries: service.price == null,
+  durationMinutes: String(service.durationMinutes),
+  category: service.category || "",
+});
 
 function AdminServicesPage() {
   const { token } = useAuth();
@@ -133,6 +152,22 @@ function AdminServicesPage() {
     resetEditState();
   };
 
+  const myLock = editingId ? locks[editingId] : null;
+  const myPosition = myLock?.position ?? 1;
+  const waitingFor = editingId && myPosition > 1 ? myLock?.editors?.[0] : null;
+
+  // Tell the admin when the one ahead of them finishes.
+  const previousWaitingForRef = useRef(null);
+  useEffect(() => {
+    const previous = previousWaitingForRef.current;
+    if (previous && !waitingFor && editingId) {
+      setNotice(
+        `${previous.holderName || "The other admin"} finished. You can save your changes now.`,
+      );
+    }
+    previousWaitingForRef.current = waitingFor;
+  }, [waitingFor, editingId]);
+
   const loseLock = useCallback(
     (message) => {
       setEditingId("");
@@ -145,26 +180,28 @@ function AdminServicesPage() {
     [refreshLocks],
   );
 
-  // Heartbeat: keep the lock alive while the edit form is open.
+  // Heartbeat: keep your place in line while the edit form is open, and
+  // learn when the admin ahead of you is done.
+  const isWaiting = Boolean(waitingFor);
   useEffect(() => {
     if (!editingId || !lockToken) return undefined;
 
-    const interval = window.setInterval(async () => {
-      try {
-        await lockServiceForEdit(editingId, token, lockToken);
-      } catch (requestError) {
-        if (isLockConflict(requestError)) {
-          loseLock(
-            requestError.status === 423
-              ? requestError.message
-              : "Your editing session expired. Click Edit to continue.",
-          );
+    const interval = window.setInterval(
+      async () => {
+        try {
+          const { lock } = await lockServiceForEdit(editingId, token, lockToken);
+          setLocks((current) => ({ ...current, [editingId]: lock }));
+        } catch (requestError) {
+          if (isLockConflict(requestError)) {
+            loseLock("Your editing session expired. Click Edit to continue.");
+          }
         }
-      }
-    }, LOCK_HEARTBEAT_MS);
+      },
+      isWaiting ? LOCK_WAITING_HEARTBEAT_MS : LOCK_HEARTBEAT_MS,
+    );
 
     return () => window.clearInterval(interval);
-  }, [editingId, lockToken, token, loseLock]);
+  }, [editingId, lockToken, token, loseLock, isWaiting]);
 
   const beginEdit = async (service) => {
     if (editingId === service._id) return;
@@ -191,22 +228,9 @@ function AdminServicesPage() {
         if (previous.serviceId) delete next[previous.serviceId];
         return next;
       });
-      setForm({
-        name: service.name,
-        description: service.description || "",
-        price: service.price == null ? "" : String(service.price),
-        priceVaries: service.price == null,
-        durationMinutes: String(service.durationMinutes),
-        category: service.category || "",
-      });
+      setForm(toForm(service));
     } catch (requestError) {
       setError(requestError.message || "Could not open this service for editing.");
-      if (requestError.details?.lock) {
-        setLocks((current) => ({
-          ...current,
-          [service._id]: requestError.details.lock,
-        }));
-      }
     } finally {
       setOpeningId("");
     }
@@ -264,7 +288,26 @@ function AdminServicesPage() {
         setNotice("Service added.");
       }
     } catch (requestError) {
-      if (editingId && isLockConflict(requestError)) {
+      const code = requestError.details?.code;
+      if (editingId && code === "SERVICE_CHANGED" && requestError.details.service) {
+        // Someone ahead saved first: show their version before this admin
+        // saves over it.
+        const latest = requestError.details.service;
+        setServices((current) =>
+          current.map((item) => (item._id === editingId ? latest : item)),
+        );
+        setForm(toForm(latest));
+        setError(requestError.message);
+      } else if (editingId && code === "SERVICE_LOCKED") {
+        // Still behind another admin: keep the form and the typed changes.
+        if (requestError.details.lock) {
+          setLocks((current) => ({
+            ...current,
+            [editingId]: requestError.details.lock,
+          }));
+        }
+        setError(requestError.message);
+      } else if (editingId && isLockConflict(requestError)) {
         loseLock(requestError.message);
       } else {
         setError(requestError.message || "Could not save this service.");
@@ -370,6 +413,13 @@ function AdminServicesPage() {
 
         <section className="customer-panel admin-services__form-panel">
           <h2>{editingId ? "Edit service" : "Add a service"}</h2>
+          {waitingFor && (
+            <p className="admin-services__queue-note" role="status">
+              {waitingFor.holderName || "Another admin"} opened this service at{" "}
+              {formatOpenedAt(waitingFor.openedAt)} and takes precedence. You
+              can keep making changes. Save unlocks when they finish.
+            </p>
+          )}
           <form className="admin-services__form" onSubmit={submit}>
             <label>
               Service name
@@ -446,13 +496,15 @@ function AdminServicesPage() {
               <button
                 className="customer-button customer-button-primary"
                 type="submit"
-                disabled={saving}
+                disabled={saving || Boolean(waitingFor)}
               >
                 {saving
                   ? "Saving…"
-                  : editingId
-                    ? "Save changes"
-                    : "Add service"}
+                  : waitingFor
+                    ? `Waiting for ${waitingFor.holderName || "another admin"}`
+                    : editingId
+                      ? "Save changes"
+                      : "Add service"}
               </button>
               {editingId && (
                 <button
@@ -511,7 +563,11 @@ function AdminServicesPage() {
               {filteredServices.map((service) => {
                 const lock = locks[service._id];
                 const isMine = editingId === service._id;
-                const lockedByOther = Boolean(lock) && !isMine;
+                const editors = lock?.editors || [];
+                const first = editors[0];
+                const othersEditing = editors.some((editor) => !editor.isMine);
+                const lockedByOther = Boolean(first) && !first.isMine;
+                const waitingCount = Math.max(editors.length - 1, 0);
                 return (
                 <article
                   className={`admin-services__item${service.isActive ? "" : " is-archived"}${lockedByOther ? " is-locked" : ""}`}
@@ -525,19 +581,28 @@ function AdminServicesPage() {
                       >
                         {service.isActive ? "Available" : "Archived"}
                       </span>
-                      {isMine && (
+                      {isMine && !lockedByOther && (
                         <span className="admin-services__lock is-mine">
                           You are editing
+                          {waitingCount > 0 && ` · ${waitingCount} waiting`}
                         </span>
                       )}
                       {lockedByOther && (
                         <span
                           className="admin-services__lock"
-                          title="This service is locked while another admin edits it."
+                          title={editors
+                            .map(
+                              (editor) =>
+                                `${editor.position}. ${editor.isMine ? "You" : editor.holderName} (opened ${formatOpenedAt(editor.openedAt)})`,
+                            )
+                            .join("\n")}
                         >
-                          {lock.isMine === false && lock.holderName
-                            ? `Being edited by ${lock.holderName}`
-                            : "Being edited"}
+                          {isMine
+                            ? `You're #${lock.position} · waiting for ${first.holderName}`
+                            : `Being edited by ${first.holderName} since ${formatOpenedAt(first.openedAt)}`}
+                          {!isMine &&
+                            waitingCount > 0 &&
+                            ` · ${waitingCount} waiting`}
                         </span>
                       )}
                     </div>
@@ -552,7 +617,7 @@ function AdminServicesPage() {
                       className="customer-button customer-button-outline"
                       type="button"
                       onClick={() => beginEdit(service)}
-                      disabled={lockedByOther || isMine || openingId === service._id}
+                      disabled={isMine || openingId === service._id}
                     >
                       {openingId === service._id ? "Opening…" : "Edit"}
                     </button>
@@ -561,7 +626,7 @@ function AdminServicesPage() {
                         className="customer-button admin-services__archive"
                         type="button"
                         onClick={() => archive(service)}
-                        disabled={lockedByOther}
+                        disabled={othersEditing}
                       >
                         Archive
                       </button>
@@ -570,7 +635,7 @@ function AdminServicesPage() {
                         className="customer-button customer-button-primary"
                         type="button"
                         onClick={() => restore(service)}
-                        disabled={lockedByOther}
+                        disabled={othersEditing}
                       >
                         Restore
                       </button>

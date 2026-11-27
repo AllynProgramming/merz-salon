@@ -238,3 +238,13 @@
     gap: 12px;
   }
 }
+
+.admin-services__queue-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid #c58a2b;
+  border-radius: 4px;
+  background: #fdf1e2;
+  color: #6b4610;
+  font-size: 14px;
+}

@@ -3,7 +3,7 @@ import {
   SERVICE_EDIT_LOCK_HEADER,
   SERVICE_EDIT_LOCK_LEASE_MS,
   acquireServiceEditLock,
-  assertHoldsServiceEditLock,
+  assertCanSaveService,
   assertNotLockedByOthers,
   listActiveServiceLocks,
   releaseServiceEditLock,
@@ -14,14 +14,21 @@ const getLockToken = (req) => {
   return typeof token === "string" && token.length <= 100 ? token : "";
 };
 
-// Lock conflicts carry a code and the holder's details so the admin page
-// can show who is editing.
+const lockErrorCodes = new Set([
+  "SERVICE_LOCKED",
+  "SERVICE_LOCK_EXPIRED",
+  "SERVICE_CHANGED",
+]);
+
+// Lock conflicts carry a code and the editors' details so the admin page
+// can show who is ahead; SERVICE_CHANGED also carries the latest service.
 const handleLockError = (error, res, next) => {
-  if (error.code === "SERVICE_LOCKED" || error.code === "SERVICE_LOCK_EXPIRED") {
+  if (lockErrorCodes.has(error.code)) {
     return res.status(error.status).json({
       message: error.message,
       code: error.code,
       ...(error.lock ? { lock: error.lock } : {}),
+      ...(error.service ? { service: error.service } : {}),
     });
   }
   return next(error);
@@ -87,15 +94,12 @@ export const updateService = async (req, res, next) => {
     }
 
     const token = getLockToken(req);
-    await assertHoldsServiceEditLock({
-      serviceId: service._id,
-      user: req.user,
-      token,
-    });
+    await assertCanSaveService({ service, token });
 
     Object.assign(service, req.body);
     await service.save();
-    // Saving ends the edit session.
+    // Saving ends this admin's edit session; the next editor in line now
+    // has precedence.
     await releaseServiceEditLock({ serviceId: service._id, token });
     return res.status(200).json({ message: "Service updated.", service });
   } catch (error) {
@@ -112,12 +116,16 @@ export const listServiceLocks = async (req, res, next) => {
   }
 };
 
-// POST /api/v1/services/:id/lock: start editing, or renew (heartbeat) when the
-// caller sends its current token in the X-Edit-Lock-Token header.
+// POST /api/v1/services/:id/lock: open the service for editing, or renew
+// (heartbeat) when the caller sends its token in the X-Edit-Lock-Token header.
+// Any number of admins can open it; the response says where the caller is in
+// line. Only the first in line can save.
 export const lockService = async (req, res, next) => {
   try {
-    const exists = await Service.exists({ _id: req.params.id });
-    if (!exists) {
+    const service = await Service.findById(req.params.id)
+      .select("updatedAt")
+      .lean();
+    if (!service) {
       return res.status(404).json({ message: "Service not found." });
     }
 
@@ -125,6 +133,7 @@ export const lockService = async (req, res, next) => {
       serviceId: req.params.id,
       user: req.user,
       token: getLockToken(req),
+      serviceUpdatedAt: service.updatedAt,
     });
     return res.status(200).json({
       token,
@@ -136,8 +145,8 @@ export const lockService = async (req, res, next) => {
   }
 };
 
-// DELETE /api/v1/services/:id/lock: stop editing. Only the holder's token can
-// release it.
+// DELETE /api/v1/services/:id/lock: stop editing. Removes only the caller's
+// own entry, identified by its token.
 export const unlockService = async (req, res, next) => {
   try {
     const token = getLockToken(req);
@@ -154,7 +163,6 @@ export const archiveService = async (req, res, next) => {
   try {
     await assertNotLockedByOthers({
       serviceId: req.params.id,
-      user: req.user,
       token: getLockToken(req),
     });
     const service = await Service.findOneAndUpdate(
@@ -176,7 +184,6 @@ export const restoreService = async (req, res, next) => {
   try {
     await assertNotLockedByOthers({
       serviceId: req.params.id,
-      user: req.user,
       token: getLockToken(req),
     });
     const service = await Service.findOneAndUpdate(
