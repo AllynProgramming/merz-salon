@@ -560,10 +560,27 @@
   }
 }
 
-.staff-booking__header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+/* Booking pages share the admin layout: side navigation + content. */
+.admin-booking-layout {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  align-items: start;
+  background: #f2f6f1;
+}
+
+.booking-page.admin-booking-layout > .booking-container {
+  width: min(1000px, calc(100% - 72px));
+  max-width: none;
+  padding: 54px 0 84px;
+}
+
+@media (max-width: 760px) {
+  .admin-booking-layout {
+    display: block;
+  }
+
+  .booking-page.admin-booking-layout > .booking-container {
+    width: min(100% - 32px, 560px);
+    padding: 28px 0 80px;
+  }
 }

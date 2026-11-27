@@ -141,7 +141,7 @@ function AdminDashboardPage() {
         </title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-dashboard">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-dashboard__heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
@@ -198,7 +198,10 @@ function AdminDashboardPage() {
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search customer or service"
+                  name="appointment-search"
+                  placeholder="Search customer or service…"
+                  autoComplete="off"
+                  spellCheck={false}
                 />
               </label>
               <label className="admin-dashboard__status-filter">

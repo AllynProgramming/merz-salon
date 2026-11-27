@@ -5,6 +5,7 @@ import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
+import Modal from "../components/admin/ui/Modal.jsx";
 import "../styles/admin-reports.css";
 
 const formatCurrency = (value) =>
@@ -13,6 +14,11 @@ const formatCurrency = (value) =>
     currency: "PHP",
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
+
+const ratingFormat = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 const formatStatus = (value) =>
   value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
@@ -159,7 +165,7 @@ function AdminReportsPage() {
         <title>Reports | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-dashboard">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
@@ -207,7 +213,7 @@ function AdminReportsPage() {
                 onClick={previewPdf}
                 disabled={driveBusy || loading}
               >
-                {driveBusy ? "Preparing preview..." : "Preview PDF"}
+                {driveBusy ? "Preparing preview…" : "Preview PDF"}
               </button>
               {driveConnected ? (
                 <button
@@ -216,7 +222,7 @@ function AdminReportsPage() {
                   onClick={uploadToDrive}
                   disabled={driveBusy || loading}
                 >
-                  {driveBusy ? "Saving..." : "Save to Google Drive"}
+                  {driveBusy ? "Saving…" : "Save to Google Drive"}
                 </button>
               ) : (
                 <button className="customer-button" type="button" onClick={connectDrive}>
@@ -234,50 +240,40 @@ function AdminReportsPage() {
           </div>
         )}
         {pdfPreviewOpen && pdfPreviewUrl && (
-          <div className="admin-reports__preview-backdrop" role="presentation">
-            <section
-              className="admin-reports__preview"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="pdf-preview-title"
-            >
-              <header className="admin-reports__preview-header">
-                <div>
-                  <p className="customer-eyebrow">Report preview</p>
-                  <h2 id="pdf-preview-title">Operations report</h2>
-                </div>
-                <button
-                  className="admin-reports__preview-close"
-                  type="button"
-                  onClick={closePdfPreview}
-                  aria-label="Close PDF preview"
-                >
-                  Close
-                </button>
-              </header>
-              <iframe
-                className="admin-reports__preview-frame"
-                src={pdfPreviewUrl}
-                title="PDF report preview"
-              />
-              <footer className="admin-reports__preview-actions">
-                <button
-                  className="customer-button customer-button-outline"
-                  type="button"
-                  onClick={closePdfPreview}
-                >
-                  Keep editing
-                </button>
-                <button className="customer-button" type="button" onClick={downloadPdf}>
-                  Download PDF
-                </button>
-              </footer>
-            </section>
-          </div>
+          <Modal onClose={closePdfPreview} size="full" className="admin-reports__preview-modal">
+            <Modal.Header>
+              <div>
+                <Modal.Eyebrow>Report preview</Modal.Eyebrow>
+                <Modal.Title>Operations report</Modal.Title>
+              </div>
+              <Modal.Close label="Close PDF preview" />
+            </Modal.Header>
+            <iframe
+              className="admin-reports__preview-frame"
+              src={pdfPreviewUrl}
+              title="PDF report preview"
+            />
+            <Modal.Footer>
+              <button
+                className="customer-button customer-button-outline"
+                type="button"
+                onClick={closePdfPreview}
+              >
+                Close preview
+              </button>
+              <button
+                className="customer-button customer-button-primary"
+                type="button"
+                onClick={downloadPdf}
+              >
+                Download PDF
+              </button>
+            </Modal.Footer>
+          </Modal>
         )}
         {loading ? (
           <div className="customer-panel admin-reports__loading" role="status">
-            Preparing your report...
+            Preparing your report…
           </div>
         ) : report ? (
           <>
@@ -322,7 +318,7 @@ function AdminReportsPage() {
                           <strong>{formatCurrency(service.revenue)}</strong>
                           <span>
                             {service.ratingCount
-                              ? `${service.averageRating.toFixed(1)} / 5 rating`
+                              ? `${ratingFormat.format(service.averageRating)} / 5 rating`
                               : "No ratings yet"}
                           </span>
                           {service.unpricedCompleted > 0 && (

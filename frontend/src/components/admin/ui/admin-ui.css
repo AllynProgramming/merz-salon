@@ -1,0 +1,478 @@
+/* Shared admin UI: modal, confirm dialog, toasts and form fields.
+   Colors follow the existing salon palette (green #205638, ink #183d2c,
+   gold #b9934c, mint background #f2f6f1). */
+
+/* ---------- Modal ---------- */
+
+html:has(dialog.admin-modal[open]) {
+  overflow: hidden;
+}
+
+.admin-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(88dvh, 820px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: #183d2c;
+  box-shadow:
+    0 30px 70px rgba(16, 44, 30, 0.28),
+    0 2px 6px rgba(16, 44, 30, 0.08);
+  overscroll-behavior: contain;
+  overflow: hidden;
+}
+
+.admin-modal--narrow {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.admin-modal--wide {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.admin-modal--full {
+  width: min(1040px, calc(100vw - 32px));
+  height: min(88dvh, 900px);
+}
+
+.admin-modal::backdrop {
+  background: rgba(18, 41, 29, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.admin-modal[open] {
+  animation: admin-modal-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.admin-modal[open]::backdrop {
+  animation: admin-fade-in 180ms ease-out;
+}
+
+@keyframes admin-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+@keyframes admin-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.admin-modal__surface {
+  display: flex;
+  max-height: inherit;
+  height: 100%;
+  flex-direction: column;
+}
+
+/* A <form> may wrap the body and footer so the footer button can submit. */
+.admin-modal__form {
+  display: contents;
+}
+
+.admin-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-top: 3px solid #b9934c;
+  border-bottom: 1px solid rgba(32, 86, 56, 0.1);
+}
+
+.admin-modal__eyebrow {
+  margin: 0 0 4px;
+  color: #8a6a2c;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-modal__title {
+  margin: 0;
+  color: #183d2c;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.admin-modal__description {
+  margin: 8px 0 0;
+  color: #52695a;
+  font-size: 14px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.admin-modal__close {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin: -4px -8px 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #52695a;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.admin-modal__close:hover {
+  background: #edf4ed;
+  color: #183d2c;
+}
+
+.admin-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 20px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(32, 86, 56, 0.1);
+  background: #f7faf6;
+}
+
+.admin-modal__footer .customer-button {
+  min-width: 112px;
+}
+
+.admin-modal :focus-visible {
+  outline: 3px solid #d1ad3b;
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .admin-modal {
+    width: 100vw;
+    max-height: 92dvh;
+    margin: auto 0 0;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .admin-modal[open] {
+    animation-name: admin-sheet-in;
+  }
+
+  .admin-modal__footer .customer-button {
+    flex: 1 1 0;
+  }
+}
+
+@keyframes admin-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* ---------- Inline notes inside modals ---------- */
+
+.admin-note {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border-left: 3px solid #205638;
+  border-radius: 4px;
+  background: #edf4ed;
+  color: #183d2c;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.admin-note--warning {
+  border-color: #c58a2b;
+  background: #fdf1e2;
+  color: #6b4610;
+}
+
+.admin-note--error {
+  border-color: #a63d32;
+  background: #fff0ed;
+  color: #76241d;
+}
+
+/* ---------- Form fields ---------- */
+
+.admin-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
+}
+
+.admin-form--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-field {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 6px;
+  color: #354e3c;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admin-field--full {
+  grid-column: 1 / -1;
+}
+
+.admin-field__hint {
+  color: #6a7f70;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.admin-field input:not([type="checkbox"]):not([type="radio"]),
+.admin-field select,
+.admin-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(32, 86, 56, 0.24);
+  border-radius: 6px;
+  background: #fff;
+  color: #183d2c;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.admin-field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.admin-field input:hover:not(:disabled),
+.admin-field select:hover:not(:disabled),
+.admin-field textarea:hover:not(:disabled) {
+  border-color: rgba(32, 86, 56, 0.42);
+}
+
+.admin-field input:focus-visible,
+.admin-field select:focus-visible,
+.admin-field textarea:focus-visible {
+  border-color: #205638;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(32, 86, 56, 0.16);
+}
+
+.admin-field input:disabled,
+.admin-field select:disabled,
+.admin-field textarea:disabled {
+  background: #f3f6f2;
+  color: #7a8b7f;
+  cursor: not-allowed;
+}
+
+.admin-field__prefix {
+  position: relative;
+}
+
+.admin-field__prefix > span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: #6a7f70;
+  font-size: 14px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.admin-field .admin-field__prefix > input:not([type="checkbox"]):not([type="radio"]) {
+  padding-left: 30px;
+}
+
+.admin-check {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  color: #354e3c;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #205638;
+  cursor: pointer;
+}
+
+/* ---------- Toasts ---------- */
+
+.admin-toaster {
+  position: fixed;
+  z-index: 60;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: grid;
+  width: min(380px, calc(100vw - 40px));
+  gap: 10px;
+  pointer-events: none;
+}
+
+.admin-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid rgba(32, 86, 56, 0.14);
+  border-left: 4px solid #205638;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(16, 44, 30, 0.18);
+  color: #183d2c;
+  pointer-events: auto;
+  animation: admin-toast-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.admin-toast--error {
+  border-left-color: #a63d32;
+}
+
+.admin-toast p {
+  margin: 1px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.admin-toast__icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #205638;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-toast--error .admin-toast__icon {
+  background: #a63d32;
+}
+
+.admin-toast__dismiss {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #52695a;
+  cursor: pointer;
+}
+
+.admin-toast__dismiss:hover {
+  background: #edf4ed;
+}
+
+.admin-toast__dismiss:focus-visible {
+  outline: 3px solid #d1ad3b;
+  outline-offset: 1px;
+}
+
+@keyframes admin-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------- Shared helpers ---------- */
+
+.admin-skip-link {
+  position: fixed;
+  z-index: 70;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #183d2c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  transform: translateY(-160%);
+  transition: transform 150ms ease;
+}
+
+.admin-skip-link:focus-visible {
+  outline: 3px solid #d1ad3b;
+  transform: none;
+}
+
+.admin-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: admin-spin 700ms linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-modal[open],
+  .admin-modal[open]::backdrop,
+  .admin-toast,
+  .admin-skip-link {
+    animation: none;
+    transition: none;
+  }
+
+  .admin-spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* The skip link focuses <main>; it isn't interactive, so no ring. */
+#admin-main:focus {
+  outline: none;
+}
+
+.admin-modal:focus {
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .admin-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

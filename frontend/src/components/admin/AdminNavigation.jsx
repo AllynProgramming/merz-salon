@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth.js";
 import { getDashboardPath } from "../../utils/accountRole.js";
+import Toaster from "./ui/Toaster.jsx";
 
 const adminItems = [
   { to: "/admin", label: "Overview", section: "Today" },
@@ -40,9 +41,12 @@ function AdminNavigation() {
 
   return (
     <aside className="admin-navigation" aria-label="Salon administration">
+      <a className="admin-skip-link" href="#admin-main">
+        Skip to main content
+      </a>
       <div className="admin-navigation__brand">
         <Link to={dashboardPath} aria-label="MERZ administration home">
-          <img src="/logo-mark.png" alt="" />
+          <img src="/logo-mark.png" alt="" width="92" height="42" />
           <span>MERZ <small>control room</small></span>
         </Link>
       </div>
@@ -89,6 +93,7 @@ function AdminNavigation() {
           Sign out
         </button>
       </div>
+      <Toaster />
     </aside>
   );
 }

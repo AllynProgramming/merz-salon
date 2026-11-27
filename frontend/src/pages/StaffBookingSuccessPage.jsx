@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link, useLocation, useParams } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import { getStaffAppointment } from "../services/bookingApi.js";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import "../styles/booking.css";
 import "../styles/admin-dashboard.css";
 import "../styles/staff-services.css";
@@ -67,12 +68,13 @@ function StaffBookingSuccessPage() {
     appointment?.serviceName || appointment?.service?.name || "Salon service";
 
   return (
-    <div className="booking-page salon-landing staff-booking-page">
+    <div className="booking-page salon-landing staff-booking-page admin-booking-layout">
+      <AdminNavigation />
       <Helmet>
         <title>Booking Confirmed | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="booking-container staff-booking">
+      <main id="admin-main" tabIndex={-1} className="booking-container staff-booking">
         <header className="booking-header staff-services__header admin-section-heading">
           <div>
             <p className="booking-eyebrow">Salon operations</p>
@@ -81,9 +83,6 @@ function StaffBookingSuccessPage() {
               Review the appointment details below.
             </p>
           </div>
-          <Link className="customer-button customer-button-outline" to="/staff">
-            Back to dashboard
-          </Link>
         </header>
 
         {loading && !appointment ? (

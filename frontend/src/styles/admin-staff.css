@@ -7,138 +7,34 @@
   padding-top: clamp(38px, 6vw, 72px);
 }
 
-.admin-staff__submit {
-  flex: 0 0 auto;
-  border-color: #205638;
-  background: #205638;
-  color: #fff;
+.admin-staff__add {
+  min-width: 170px;
 }
 
-.admin-staff__submit:hover:not(:disabled) {
-  border-color: #173f2b;
-  background: #173f2b;
-  color: #fff;
-}
-
-.admin-staff__layout {
-  display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
-  align-items: start;
-  gap: 20px;
-  margin-top: 26px;
-}
-
-.admin-staff__form-panel,
 .admin-staff__list-panel {
-  padding: clamp(20px, 3vw, 30px);
-}
-
-.admin-staff__form-panel h2,
-.admin-staff__list-heading h2 {
-  margin: 0;
-  color: #183d2c;
-  font-size: clamp(22px, 3vw, 28px);
-}
-
-.admin-staff__form-panel > p,
-.admin-staff__list-heading p {
-  margin: 7px 0 0;
-  color: #718175;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.admin-staff__form {
-  display: grid;
-  gap: 15px;
-  margin-top: 22px;
-}
-
-.admin-staff__form label {
-  display: grid;
-  gap: 7px;
-  color: #354e3c;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.admin-staff__form input {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid rgba(32, 86, 56, 0.24);
-  border-radius: 3px;
-  background: #fff;
-  color: #183d2c;
-  font: inherit;
-  font-size: 14px;
-}
-
-.admin-staff__form select,
-.admin-staff__edit-form select {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid rgba(32, 86, 56, 0.24);
-  border-radius: 3px;
-  background: #fff;
-  color: #183d2c;
-  font: inherit;
-  font-size: 13px;
-}
-
-.admin-staff__edit-form select {
-  min-height: 34px;
-  padding: 6px 8px;
-  font-size: 12px;
-}
-
-.admin-staff__form input:focus-visible {
-  border-color: #205638;
-  outline: 2px solid rgba(32, 86, 56, 0.3);
-  outline-offset: 2px;
-}
-
-.admin-staff__form select:focus-visible,
-.admin-staff__edit-form select:focus-visible {
-  border-color: #205638;
-  outline: 2px solid rgba(32, 86, 56, 0.3);
-  outline-offset: 2px;
-}
-
-.admin-staff__hint {
-  color: #718175;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
-.admin-staff__submit {
-  width: 100%;
-  margin-top: 4px;
+  margin-top: 26px;
+  padding: clamp(20px, 4vw, 32px);
 }
 
 .admin-staff__list-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 17px;
+  padding-bottom: 16px;
   border-bottom: 1px solid rgba(32, 86, 56, 0.14);
 }
 
-.admin-staff__list-heading > span {
-  display: grid;
-  min-width: 34px;
-  height: 34px;
-  padding: 0 8px;
-  place-items: center;
-  border-radius: 50%;
-  background: #eaf3e9;
-  color: #205638;
-  font-size: 13px;
-  font-weight: 700;
+.admin-staff__list-heading h2 {
+  margin: 0;
+  color: #183d2c;
+  font-size: clamp(24px, 3vw, 30px);
+  text-wrap: balance;
 }
+
+.admin-staff__list-heading p {
+  margin: 4px 0 0;
+  color: #718175;
+  font-size: 13px;
+}
+
+/* ---------- Team list ---------- */
 
 .admin-staff__list {
   margin: 0;
@@ -147,37 +43,52 @@
 }
 
 .admin-staff__member {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 13px;
-  padding: 16px 2px;
+  gap: 14px;
+  padding: 14px 10px;
   border-bottom: 1px solid rgba(32, 86, 56, 0.12);
+  transition: background-color 120ms ease;
+}
+
+.admin-staff__member:hover {
+  background: #f8fbf7;
 }
 
 .admin-staff__avatar {
   display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border-radius: 50%;
   background: #edf0df;
   color: #205638;
   font-family: "Newsreader", Georgia, serif;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 600;
+}
+
+.admin-staff__avatar--admin {
+  background: #183d2c;
+  color: #f6ecc8;
+}
+
+.admin-staff__avatar--manager {
+  background: #f6ecc8;
+  color: #6b4f12;
 }
 
 .admin-staff__member-details {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 3px;
 }
 
 .admin-staff__member-details strong {
   overflow: hidden;
   color: #183d2c;
-  font-size: 14px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -185,138 +96,212 @@
 .admin-staff__member-details > span {
   overflow: hidden;
   color: #718175;
-  font-size: 12px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .admin-staff__role {
-  margin-left: auto;
-  padding: 4px 9px;
+  justify-self: end;
+  padding: 4px 10px;
   border-radius: 20px;
   background: #eaf3e9;
   color: #205638;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.admin-staff__role--admin {
+  background: #183d2c;
+  color: #fff;
+}
+
+.admin-staff__role--manager {
+  background: #f6ecc8;
+  color: #6b4f12;
 }
 
 .admin-staff__member-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.admin-staff__member-actions button,
-.admin-staff__edit-actions button {
-  padding: 6px 9px;
-  border: 1px solid rgba(32, 86, 56, 0.22);
-  border-radius: 3px;
-  background: #fff;
-  color: #205638;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.admin-staff__member-actions button:hover,
-.admin-staff__edit-actions button:hover {
-  background: #eaf3e9;
-}
-
-.admin-staff__edit-form {
-  display: grid;
-  flex: 1;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.admin-staff__edit-form label {
-  display: grid;
-  gap: 4px;
-  color: #52695a;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.admin-staff__edit-form input {
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid rgba(32, 86, 56, 0.24);
-  border-radius: 3px;
-  color: #183d2c;
-  font: inherit;
-  font-size: 12px;
-}
-
-.admin-staff__member-email {
-  grid-column: 1 / -1;
-  color: #718175;
-  font-size: 11px;
-}
-
-.admin-staff__edit-actions {
-  display: flex;
-  grid-column: 1 / -1;
-  gap: 6px;
-}
-
-.admin-staff__temporary-password {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
-.admin-staff__temporary-password code {
-  padding: 3px 6px;
-  background: #fff;
-  color: #183d2c;
-  font-size: 13px;
-  font-weight: 700;
+.admin-staff__member-actions .customer-button {
+  min-height: 38px;
+  padding: 0 14px;
 }
 
-.admin-staff__temporary-password button {
-  margin-left: auto;
+/* ---------- Loading and empty states ---------- */
+
+.admin-staff__skeleton > span:last-child {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-staff__skeleton .admin-staff__avatar,
+.admin-staff__skeleton > span:last-child > span {
+  background: linear-gradient(90deg, #eef3ed 25%, #f7faf6 50%, #eef3ed 75%);
+  background-size: 200% 100%;
+  animation: admin-staff-shimmer 1.3s ease-in-out infinite;
+}
+
+.admin-staff__skeleton > span:last-child > span {
+  display: block;
+  width: 40%;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.admin-staff__skeleton > span:last-child > span + span {
+  width: 60%;
+  height: 10px;
+}
+
+@keyframes admin-staff-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.admin-staff__empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 40px 16px;
+  color: #52695a;
+  text-align: center;
+}
+
+.admin-staff__empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ---------- Access level choices (inside the modal) ---------- */
+
+.admin-staff__roles {
+  margin: 0;
+  padding: 0;
   border: 0;
-  background: transparent;
-  color: #205638;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
+}
+
+.admin-staff__roles legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.admin-staff__role-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(32, 86, 56, 0.2);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
 }
 
-.admin-staff__notice {
-  margin-top: 16px;
-  border-color: rgba(32, 86, 56, 0.2);
-  background: #eaf3e9;
-  color: #205638;
+.admin-staff__role-option + .admin-staff__role-option {
+  margin-top: 8px;
 }
 
-.admin-staff__form :disabled {
-  cursor: wait;
-  opacity: 0.7;
+.admin-staff__role-option:hover {
+  border-color: rgba(32, 86, 56, 0.42);
+}
+
+.admin-staff__role-option.is-selected {
+  border-color: #205638;
+  background: #f2f8f1;
+  box-shadow: inset 0 0 0 1px #205638;
+}
+
+.admin-staff__role-option:focus-within {
+  outline: 3px solid #d1ad3b;
+  outline-offset: 2px;
+}
+
+.admin-staff__role-option input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: #205638;
+}
+
+.admin-staff__role-option input:focus-visible {
+  outline: none;
+}
+
+.admin-staff__role-option > span {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-staff__role-option strong {
+  color: #183d2c;
+  font-size: 14px;
+}
+
+.admin-staff__role-option small {
+  color: #607566;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* ---------- Temporary password (inside the modal) ---------- */
+
+.admin-staff__password {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.admin-staff__password code {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px dashed rgba(32, 86, 56, 0.4);
+  border-radius: 6px;
+  background: #f7faf6;
+  color: #183d2c;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.admin-staff__password-hint {
+  margin: 12px 0 0;
+  color: #52695a;
+  font-size: 13px;
 }
 
 @media (max-width: 760px) {
-  .admin-staff__layout {
-    grid-template-columns: 1fr;
-  }
-
   .admin-staff__member {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .admin-staff__member-actions {
-    width: 100%;
-    margin-left: 53px;
+    grid-column: 1 / -1;
   }
 
-  .admin-staff__edit-form {
-    flex-basis: calc(100% - 53px);
+  .admin-staff__member-actions .customer-button {
+    flex: 1 1 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-staff__skeleton .admin-staff__avatar,
+  .admin-staff__skeleton > span:last-child > span {
+    animation: none;
   }
 }

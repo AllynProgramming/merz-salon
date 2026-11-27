@@ -1,36 +1,21 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
+import Modal from "../components/admin/ui/Modal.jsx";
+import useConfirm from "../components/admin/ui/useConfirm.jsx";
+import { toast } from "../components/admin/ui/toast.js";
+import StaffForm from "../components/admin/StaffForm.jsx";
+import {
+  emptyStaffForm,
+  isStaffFormDirty,
+  staffRoleLabel,
+  toStaffForm,
+  toStaffPayload,
+} from "../components/admin/staffRoles.js";
 import "../styles/admin-staff.css";
-
-const emptyForm = {
-  name: "",
-  email: "",
-  phone: "",
-  role: "staff",
-};
-
-const roleOptions = [
-  {
-    value: "staff",
-    label: "Staff",
-    description: "Appointments and day-to-day schedule work.",
-  },
-  {
-    value: "manager",
-    label: "Manager",
-    description: "Staff workspace with expanded operational responsibility.",
-  },
-  {
-    value: "admin",
-    label: "Admin",
-    description: "Full control, including team accounts and settings.",
-  },
-];
 
 async function requestStaff(path, token, options = {}) {
   const response = await fetch(path, {
@@ -48,24 +33,24 @@ async function requestStaff(path, token, options = {}) {
   return payload;
 }
 
+const byName = (first, second) => first.name.localeCompare(second.name);
+
 function AdminStaffPage() {
   const { token } = useAuth();
   const [staff, setStaff] = useState([]);
-  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
-  const [listLoadError, setListLoadError] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  // The open modal: null, { mode: "add" } or { mode: "edit", member }.
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState(emptyStaffForm);
+  const [initialForm, setInitialForm] = useState(emptyStaffForm);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [temporaryPassword, setTemporaryPassword] = useState("");
-  const [editingId, setEditingId] = useState("");
-  const [editDraft, setEditDraft] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    role: "staff",
-  });
-  const [editingSaving, setEditingSaving] = useState(false);
+  const [modalError, setModalError] = useState("");
+  // Shown once after creating an account or resetting a password.
+  const [credentials, setCredentials] = useState(null);
+  const [resettingId, setResettingId] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
 
   useEffect(() => {
     let active = true;
@@ -76,8 +61,7 @@ function AdminStaffPage() {
       })
       .catch((requestError) => {
         if (active) {
-          setListLoadError(true);
-          setError(requestError.message || "Could not load staff accounts.");
+          setLoadError(requestError.message || "Could not load staff accounts.");
         }
       })
       .finally(() => {
@@ -89,123 +73,132 @@ function AdminStaffPage() {
     };
   }, [token]);
 
-  const updateField = (event) => {
-    setForm((current) => ({
-      ...current,
-      [event.target.name]: event.target.value,
-    }));
-    setError("");
-    setNotice("");
-    setTemporaryPassword("");
+  const openModal = (next) => {
+    const values = next.member ? toStaffForm(next.member) : emptyStaffForm;
+    setForm(values);
+    setInitialForm(values);
+    setModalError("");
+    setModal(next);
+  };
+
+  const requestClose = async () => {
+    if (saving) return;
+    if (
+      isStaffFormDirty(form, initialForm) &&
+      !(await confirm({
+        title: "Discard your changes?",
+        description: "The details you entered haven't been saved.",
+        confirmLabel: "Discard changes",
+        cancelLabel: "Keep editing",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setModal(null);
+  };
+
+  const showCredentials = (member, temporaryPassword, reason) => {
+    if (!temporaryPassword) return;
+    setCopied(false);
+    setCredentials({ member, temporaryPassword, reason });
   };
 
   const submit = async (event) => {
     event.preventDefault();
-    setError("");
-    setNotice("");
-
+    if (saving) return;
     setSaving(true);
+    setModalError("");
     try {
-      const payload = await requestStaff("/api/v1/admin/staff", token, {
-        method: "POST",
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-          role: form.role,
-        }),
-      });
-      setStaff((current) =>
-        [...current, payload.staff].sort((first, second) =>
-          first.name.localeCompare(second.name),
-        ),
-      );
-      setForm(emptyForm);
-      setTemporaryPassword(payload.temporaryPassword || "");
-      setNotice(
-        `${payload.staff.name} can now log in. Share the temporary password once.`,
-      );
+      if (modal.mode === "edit") {
+        const payload = await requestStaff(
+          `/api/v1/admin/staff/${encodeURIComponent(modal.member._id)}`,
+          token,
+          { method: "PUT", body: JSON.stringify(toStaffPayload(form)) },
+        );
+        setStaff((current) =>
+          current
+            .map((member) =>
+              member._id === modal.member._id ? payload.staff : member,
+            )
+            .sort(byName),
+        );
+        setModal(null);
+        toast.success(`${payload.staff.name}'s details were updated.`);
+      } else {
+        const payload = await requestStaff("/api/v1/admin/staff", token, {
+          method: "POST",
+          body: JSON.stringify(toStaffPayload(form)),
+        });
+        setStaff((current) => [...current, payload.staff].sort(byName));
+        setModal(null);
+        showCredentials(payload.staff, payload.temporaryPassword, "created");
+      }
     } catch (requestError) {
-      setError(requestError.message || "Could not create this staff account.");
+      setModalError(
+        requestError.message ||
+          (modal.mode === "edit"
+            ? "Could not update this staff account."
+            : "Could not create this staff account."),
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const startEditing = (member) => {
-    setEditingId(member._id);
-    setEditDraft({
-      name: member.name,
-      email: member.email,
-      phone: member.phone || "",
-      role: member.role || "staff",
-    });
-    setError("");
-    setNotice("");
-    setTemporaryPassword("");
-  };
-
-  const saveEdit = async (event) => {
-    event.preventDefault();
-    setEditingSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const payload = await requestStaff(
-        `/api/v1/admin/staff/${encodeURIComponent(editingId)}`,
-        token,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            name: editDraft.name.trim(),
-            email: editDraft.email.trim(),
-            phone: editDraft.phone.trim(),
-            role: editDraft.role,
-          }),
-        },
-      );
-      setStaff((current) =>
-        current
-          .map((member) => (member._id === editingId ? payload.staff : member))
-          .sort((first, second) => first.name.localeCompare(second.name)),
-      );
-      setEditingId("");
-      setNotice("Staff account details updated.");
-    } catch (requestError) {
-      setError(requestError.message || "Could not update this staff account.");
-    } finally {
-      setEditingSaving(false);
-    }
-  };
-
   const resetPassword = async (member) => {
-    setEditingSaving(true);
-    setError("");
-    setNotice("");
+    if (resettingId) return;
+    const confirmed = await confirm({
+      title: `Reset ${member.name}'s password?`,
+      description:
+        "Their current password stops working right away. You'll get a temporary password to share with them, and they must change it at their next sign-in.",
+      confirmLabel: "Reset password",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setResettingId(member._id);
     try {
       const payload = await requestStaff(
         `/api/v1/admin/staff/${encodeURIComponent(member._id)}`,
         token,
-        {
-          method: "PUT",
-          body: JSON.stringify({ resetPassword: true }),
-        },
+        { method: "PUT", body: JSON.stringify({ resetPassword: true }) },
       );
       setStaff((current) =>
-        current.map((item) =>
-          item._id === member._id ? payload.staff : item,
-        ),
+        current.map((item) => (item._id === member._id ? payload.staff : item)),
       );
-      setTemporaryPassword(payload.temporaryPassword || "");
-      setNotice(
-        `A new temporary password was generated for ${member.name}. Share it securely once.`,
-      );
+      showCredentials(payload.staff, payload.temporaryPassword, "reset");
     } catch (requestError) {
-      setError(requestError.message || "Could not reset this staff password.");
+      toast.error(requestError.message || "Could not reset this staff password.");
     } finally {
-      setEditingSaving(false);
+      setResettingId("");
     }
   };
+
+  const copyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(credentials.temporaryPassword);
+      setCopied(true);
+    } catch {
+      toast.error("Couldn't copy automatically. Select the password and copy it.");
+    }
+  };
+
+  const closeCredentials = () => {
+    const { member, reason } = credentials;
+    setCredentials(null);
+    toast.success(
+      reason === "created"
+        ? `${member.name} can now sign in.`
+        : `${member.name}'s password was reset.`,
+    );
+  };
+
+  const roleCounts = staff.reduce((counts, member) => {
+    const label = staffRoleLabel(member.role);
+    counts[label] = (counts[label] || 0) + 1;
+    return counts;
+  }, {});
 
   return (
     <div className="customer-page salon-landing admin-staff-page">
@@ -214,7 +207,7 @@ function AdminStaffPage() {
         <title>Staff Accounts | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-staff">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-staff">
         <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
@@ -224,249 +217,235 @@ function AdminStaffPage() {
               schedules in the right hands.
             </p>
           </div>
-          <Link className="customer-button customer-button-outline" to="/admin">
-            Back to dashboard
-          </Link>
+          <button
+            className="customer-button customer-button-primary admin-staff__add"
+            type="button"
+            onClick={() => openModal({ mode: "add" })}
+          >
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+              <path
+                d="M10 4v12M4 10h12"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            Add team member
+          </button>
         </header>
 
-        {error && (
+        {loadError && (
           <div className="customer-alert customer-alert-error" role="alert">
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div className="customer-alert admin-staff__notice" role="status">
-            {notice}
-          </div>
-        )}
-        {temporaryPassword && (
-          <div className="customer-alert admin-staff__temporary-password" role="status">
-            <strong>Temporary password — share it securely now:</strong>{" "}
-            <code>{temporaryPassword}</code>
-            <button
-              type="button"
-              onClick={() => setTemporaryPassword("")}
-            >
-              Hide password
-            </button>
+            {loadError} Refresh the page to try again.
           </div>
         )}
 
-        <div className="admin-staff__layout">
-          <section className="customer-panel admin-staff__form-panel">
-            <h2>Add a team member</h2>
-            <p>
-              Create the sign-in, then choose the level of access that fits the
-              role.
-            </p>
-            <form className="admin-staff__form" onSubmit={submit}>
-              <label>
-                Full name
-                <input
-                  name="name"
-                  value={form.name}
-                  onChange={updateField}
-                  autoComplete="name"
-                  minLength="2"
-                  maxLength="120"
-                  required
-                />
-              </label>
-              <label>
-                Email address
-                <input
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={updateField}
-                  autoComplete="email"
-                  maxLength="254"
-                  required
-                />
-              </label>
-              <label>
-                Phone number
-                <input
-                  name="phone"
-                  type="tel"
-                  value={form.phone}
-                  onChange={updateField}
-                  autoComplete="tel"
-                  minLength="7"
-                  maxLength="30"
-                  required
-                />
-              </label>
-              <label>
-                Access level
-                <select
-                  name="role"
-                  value={form.role}
-                  onChange={updateField}
-                >
-                  {roleOptions.map((option) => (
-                    <option value={option.value} key={option.value}>
-                      {option.label} — {option.description}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="admin-staff__hint">
-                A temporary password will be generated after you create the
-                account. The team member must replace it at first sign-in.
+        <section
+          className="customer-panel admin-staff__list-panel"
+          aria-labelledby="admin-staff-list-heading"
+        >
+          <div className="admin-staff__list-heading">
+            <div>
+              <h2 id="admin-staff-list-heading">Your team</h2>
+              <p className="admin-tabular">
+                {loading
+                  ? "Loading…"
+                  : staff.length === 0
+                    ? "No accounts yet"
+                    : Object.entries(roleCounts)
+                        .map(([label, count]) => `${count} ${label.toLocaleLowerCase()}${count === 1 ? "" : "s"}`)
+                        .join(" · ")}
               </p>
-              <button
-                className="customer-button admin-staff__submit"
-                type="submit"
-                disabled={saving}
-              >
-                {saving ? "Creating account..." : "Create staff account"}
-              </button>
-            </form>
-          </section>
-
-          <section
-            className="customer-panel admin-staff__list-panel"
-            aria-labelledby="admin-staff-list-heading"
-          >
-            <div className="admin-staff__list-heading">
-              <div>
-                <h2 id="admin-staff-list-heading">Your team</h2>
-                <p>                Team accounts with access matched to their role.</p>
-              </div>
-              <span>{staff.length}</span>
             </div>
-            {loading ? (
-              <p role="status">Loading staff accounts…</p>
-            ) : listLoadError ? (
-              <p className="customer-empty-state">
-                Staff accounts could not be loaded.
-              </p>
-            ) : staff.length === 0 ? (
-              <p className="customer-empty-state">
-                No staff accounts yet. Add a team member to get started.
-              </p>
-            ) : (
-              <ul className="admin-staff__list">
-                {staff.map((member) => (
-                  <li className="admin-staff__member" key={member._id}>
-                    <span className="admin-staff__avatar" aria-hidden="true">
-                      {member.name.charAt(0).toLocaleUpperCase()}
-                    </span>
-                    {editingId === member._id ? (
-                      <form className="admin-staff__edit-form" onSubmit={saveEdit}>
-                        <label>
-                          Name
-                          <input
-                            value={editDraft.name}
-                            onChange={(event) =>
-                              setEditDraft((current) => ({
-                                ...current,
-                                name: event.target.value,
-                              }))
-                            }
-                            minLength="2"
-                            maxLength="120"
-                            required
-                          />
-                        </label>
-                        <label>
-                          Email
-                          <input
-                            type="email"
-                            value={editDraft.email}
-                            onChange={(event) =>
-                              setEditDraft((current) => ({
-                                ...current,
-                                email: event.target.value,
-                              }))
-                            }
-                            autoComplete="email"
-                            maxLength="254"
-                            required
-                          />
-                        </label>
-                        <label>
-                          Phone
-                          <input
-                            value={editDraft.phone}
-                            onChange={(event) =>
-                              setEditDraft((current) => ({
-                                ...current,
-                                phone: event.target.value,
-                              }))
-                            }
-                            minLength="7"
-                            maxLength="30"
-                            required
-                          />
-                        </label>
-                        <label>
-                          Access level
-                          <select
-                            value={editDraft.role}
-                            onChange={(event) =>
-                              setEditDraft((current) => ({
-                                ...current,
-                                role: event.target.value,
-                              }))
-                            }
-                          >
-                            {roleOptions.map((option) => (
-                              <option value={option.value} key={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <span className="admin-staff__member-email">
-                          Email: {member.email}
-                        </span>
-                        <div className="admin-staff__edit-actions">
-                          <button type="submit" disabled={editingSaving}>
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId("")}
-                            disabled={editingSaving}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        <span className="admin-staff__member-details">
-                          <strong>{member.name}</strong>
-                          <span>{member.email}</span>
-                          <span>{member.phone || "No phone number"}</span>
-                        </span>
-                        <span className="admin-staff__role">
-                          {roleOptions.find((option) => option.value === member.role)?.label ||
-                            "Staff"}
-                        </span>
-                        <div className="admin-staff__member-actions">
-                          <button type="button" onClick={() => startEditing(member)}>
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => resetPassword(member)}
-                            disabled={editingSaving}
-                          >
-                            Reset password
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+          </div>
+          {loading ? (
+            <ul className="admin-staff__list" aria-busy="true">
+              <li className="admin-dashboard__visually-hidden" role="status">
+                Loading staff accounts…
+              </li>
+              {[0, 1, 2].map((item) => (
+                <li className="admin-staff__member admin-staff__skeleton" key={item}>
+                  <span className="admin-staff__avatar" />
+                  <span>
+                    <span />
+                    <span />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : !loadError && staff.length === 0 ? (
+            <div className="admin-staff__empty">
+              <p>No staff accounts yet. Add your first team member to get started.</p>
+              <button
+                className="customer-button customer-button-primary"
+                type="button"
+                onClick={() => openModal({ mode: "add" })}
+              >
+                Add team member
+              </button>
+            </div>
+          ) : (
+            <ul className="admin-staff__list">
+              {staff.map((member) => (
+                <li className="admin-staff__member" key={member._id}>
+                  <span
+                    className={`admin-staff__avatar admin-staff__avatar--${member.role || "staff"}`}
+                    aria-hidden="true"
+                  >
+                    {member.name.charAt(0).toLocaleUpperCase()}
+                  </span>
+                  <span className="admin-staff__member-details">
+                    <strong>{member.name}</strong>
+                    <span translate="no">{member.email}</span>
+                    <span>{member.phone || "No phone number"}</span>
+                  </span>
+                  <span
+                    className={`admin-staff__role admin-staff__role--${member.role || "staff"}`}
+                  >
+                    {staffRoleLabel(member.role)}
+                  </span>
+                  <div className="admin-staff__member-actions">
+                    <button
+                      className="customer-button customer-button-outline"
+                      type="button"
+                      onClick={() => openModal({ mode: "edit", member })}
+                      aria-label={`Edit ${member.name}`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="customer-button customer-button-outline"
+                      type="button"
+                      onClick={() => resetPassword(member)}
+                      aria-busy={resettingId === member._id || undefined}
+                      disabled={Boolean(resettingId) && resettingId !== member._id}
+                      aria-label={`Reset password for ${member.name}`}
+                    >
+                      {resettingId === member._id ? (
+                        <>
+                          <span className="admin-spinner" aria-hidden="true" />
+                          Resetting…
+                        </>
+                      ) : (
+                        "Reset password"
+                      )}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
+
+      {modal && (
+        <Modal onClose={requestClose} size="wide">
+          <Modal.Header>
+            <div>
+              <Modal.Eyebrow>
+                {modal.mode === "edit" ? "Edit team member" : "New team member"}
+              </Modal.Eyebrow>
+              <Modal.Title>
+                {modal.mode === "edit" ? modal.member.name : "Add a team member"}
+              </Modal.Title>
+              <Modal.Description>
+                {modal.mode === "edit"
+                  ? "Update their contact details or change what they can access."
+                  : "A temporary password is generated when you create the account. They must replace it at their first sign-in."}
+              </Modal.Description>
+            </div>
+            <Modal.Close label="Close without saving" />
+          </Modal.Header>
+          <Modal.Body>
+            {modalError && (
+              <p className="admin-note admin-note--error" role="alert">
+                {modalError}
+              </p>
+            )}
+            <StaffForm
+              id="staff-form"
+              form={form}
+              onChange={(next) => {
+                setForm(next);
+                setModalError("");
+              }}
+              onSubmit={submit}
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={requestClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="customer-button customer-button-primary"
+              type="submit"
+              form="staff-form"
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <span className="admin-spinner" aria-hidden="true" />
+                  {modal.mode === "edit" ? "Saving…" : "Creating…"}
+                </>
+              ) : modal.mode === "edit" ? (
+                "Save changes"
+              ) : (
+                "Create account"
+              )}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {credentials && (
+        // Closing needs a deliberate click on Done, so the password isn't
+        // lost to a stray Escape or backdrop click.
+        <Modal onClose={() => {}} size="narrow">
+          <Modal.Header>
+            <div>
+              <Modal.Eyebrow>
+                {credentials.reason === "created" ? "Account created" : "Password reset"}
+              </Modal.Eyebrow>
+              <Modal.Title>Temporary password for {credentials.member.name}</Modal.Title>
+              <Modal.Description>
+                Share it with them securely. It is shown only once, and they
+                must change it when they sign in.
+              </Modal.Description>
+            </div>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="admin-staff__password">
+              <code translate="no">{credentials.temporaryPassword}</code>
+              <button
+                className="customer-button customer-button-outline"
+                type="button"
+                onClick={copyPassword}
+                data-autofocus
+              >
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
+            </div>
+            <p className="admin-staff__password-hint">
+              Sign-in email: <span translate="no">{credentials.member.email}</span>
+            </p>
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-primary"
+              type="button"
+              onClick={closeCredentials}
+            >
+              Done
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+      {confirmDialog}
     </div>
   );
 }

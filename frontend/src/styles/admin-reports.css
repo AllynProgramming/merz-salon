@@ -81,3 +81,9 @@
   .admin-reports__preview { height: 94vh; }
   .admin-reports__preview-actions { flex-wrap: wrap; }
 }
+
+/* PDF preview inside the shared modal: the frame fills the space between
+   the header and footer. */
+.admin-reports__preview-modal .admin-reports__preview-frame {
+  flex: 1 1 auto;
+}

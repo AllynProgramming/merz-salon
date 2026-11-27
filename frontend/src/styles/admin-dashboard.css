@@ -2270,3 +2270,153 @@
   width: min(1200px, calc(100% - 72px));
   padding: 54px 0 84px;
 }
+
+/* ---------- Staff working hours: summary list + modal editor ---------- */
+
+.admin-schedule__hours-loading {
+  margin: 0;
+  color: #718175;
+  font-size: 13px;
+}
+
+.admin-schedule__hours-summary {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(32, 86, 56, 0.14);
+  list-style: none;
+}
+
+.admin-schedule__hours-summary li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 6px;
+  border-bottom: 1px solid rgba(32, 86, 56, 0.12);
+  transition: background-color 120ms ease;
+}
+
+.admin-schedule__hours-summary li:hover {
+  background: #f8fbf7;
+}
+
+.admin-schedule__hours-name {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-schedule__hours-name strong {
+  color: #183d2c;
+  font-size: 14px;
+}
+
+.admin-schedule__hours-name span {
+  color: #607566;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-schedule__hours-summary .customer-button {
+  min-height: 38px;
+  flex: 0 0 auto;
+}
+
+.admin-modal .admin-schedule__hours-form {
+  display: block;
+}
+
+.admin-modal .admin-schedule__hours-list {
+  width: 100%;
+}
+
+.admin-modal .admin-schedule__hours-row {
+  grid-template-columns: minmax(130px, 1fr) minmax(120px, 1fr) auto minmax(120px, 1fr);
+  min-height: 56px;
+  padding-block: 4px;
+}
+
+.admin-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
+  grid-column: 2 / -1;
+  grid-row: auto;
+}
+
+.admin-modal .admin-schedule__hours-row.is-off .admin-schedule__hours-day span {
+  color: #718175;
+}
+
+.admin-modal .admin-schedule__time-field input {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-modal .admin-schedule__time-field input:focus-visible {
+  border-color: #205638;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(32, 86, 56, 0.16);
+}
+
+@media (max-width: 560px) {
+  .admin-modal .admin-schedule__hours-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    padding-block: 10px;
+  }
+
+  .admin-modal .admin-schedule__hours-day {
+    grid-column: 1 / -1;
+  }
+
+  .admin-modal .admin-schedule__hours-row .admin-schedule__time-field:last-of-type {
+    grid-column: auto;
+  }
+
+  .admin-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
+    grid-column: 1 / -1;
+  }
+
+  .admin-schedule__hours-summary li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* ---------- Polish: navigation feedback and number alignment ---------- */
+
+.admin-navigation__group a,
+.admin-navigation__footer a,
+.admin-navigation__footer button {
+  border-radius: 6px;
+  touch-action: manipulation;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.admin-navigation :focus-visible {
+  outline: 2px solid #d1ad3b;
+  outline-offset: 2px;
+}
+
+.admin-dashboard__stat strong,
+.admin-dashboard__today-metric strong,
+.admin-dashboard__appointment-time,
+.admin-feedback__average strong,
+.admin-feedback__rating span,
+.admin-reports__status-list strong,
+.admin-reports__hero strong,
+.admin-schedule__appointment-meta dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-dashboard__search input:focus-visible,
+.admin-dashboard__status-filter select:focus-visible {
+  outline: none;
+  border-color: #205638;
+  box-shadow: 0 0 0 3px rgba(32, 86, 56, 0.16);
+}
+
+.admin-dashboard__status-filter select,
+.admin-schedule__assign-select {
+  background-color: #fff;
+  color: #183d2c;
+}

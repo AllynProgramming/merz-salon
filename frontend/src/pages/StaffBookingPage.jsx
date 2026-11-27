@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import useAuth from "../context/useAuth.js";
 import {
   formatDuration,
@@ -15,6 +15,7 @@ import {
   getStaffAvailability,
   searchBookingCustomers,
 } from "../services/bookingApi.js";
+import AdminNavigation from "../components/admin/AdminNavigation.jsx";
 import "../styles/booking.css";
 import "../styles/admin-dashboard.css";
 import "../styles/staff-services.css";
@@ -73,8 +74,6 @@ function StaffBookingPage() {
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [creatingReminderTests, setCreatingReminderTests] = useState(false);
-  const [reminderTestMessage, setReminderTestMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -323,39 +322,14 @@ function StaffBookingPage() {
     }
   };
 
-  const createReminderTests = async () => {
-    if (!token || creatingReminderTests) return;
-    setCreatingReminderTests(true);
-    setReminderTestMessage("");
-    setError("");
-    try {
-      const response = await fetch("/api/v1/staff/appointments/test-reminders", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.message || "Could not create test reminders.");
-      }
-      setReminderTestMessage(
-        `Created test appointments for ${payload.appointments
-          .map((appointment) => appointment.startTime)
-          .join(" and ")}.`,
-      );
-    } catch (requestError) {
-      setError(requestError.message || "Could not create test reminders.");
-    } finally {
-      setCreatingReminderTests(false);
-    }
-  };
-
   return (
-    <div className="booking-page salon-landing staff-booking-page">
+    <div className="booking-page salon-landing staff-booking-page admin-booking-layout">
+      <AdminNavigation />
       <Helmet>
         <title>Book for a Customer | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="booking-container staff-booking">
+      <main id="admin-main" tabIndex={-1} className="booking-container staff-booking">
         <header className="booking-header staff-services__header admin-section-heading">
           <div>
             <p className="booking-eyebrow">Salon operations</p>
@@ -364,21 +338,6 @@ function StaffBookingPage() {
               Choose an existing customer or book a walk-in guest, then select a
               service and appointment time.
             </p>
-          </div>
-          <div className="staff-booking__header-actions">
-            <button
-              className="customer-button customer-button-outline"
-              type="button"
-              onClick={createReminderTests}
-              disabled={creatingReminderTests}
-            >
-              {creatingReminderTests
-                ? "Creating test reminders..."
-                : "Test reminder popups"}
-            </button>
-            <Link className="customer-button customer-button-outline" to="/staff">
-              Back to dashboard
-            </Link>
           </div>
         </header>
 
@@ -390,11 +349,6 @@ function StaffBookingPage() {
         {servicesError && (
           <div className="booking-state booking-state-error" role="alert">
             {servicesError}
-          </div>
-        )}
-        {reminderTestMessage && (
-          <div className="booking-state booking-state-success" role="status">
-            {reminderTestMessage}
           </div>
         )}
 

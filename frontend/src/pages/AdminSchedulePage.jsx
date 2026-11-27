@@ -7,6 +7,9 @@ import { cancelStaffAppointment } from "../services/bookingApi.js";
 import { formatPrice } from "../components/booking/bookingUtils.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
+import Modal from "../components/admin/ui/Modal.jsx";
+import useConfirm from "../components/admin/ui/useConfirm.jsx";
+import { toast } from "../components/admin/ui/toast.js";
 import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
 import { getDashboardPath } from "../utils/accountRole.js";
 import "../styles/customer.css";
@@ -142,6 +145,49 @@ function workingHoursForStaff(member) {
   );
 }
 
+const shortWeekday = (weekday) => weekdayNames[weekday].slice(0, 3);
+
+const formatClock = (value) => {
+  const [hours, minutes] = value.split(":").map(Number);
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(2000, 0, 1, hours, minutes));
+};
+
+// "Mon–Fri · 9:00 AM–6:00 PM, Sat · 10:00 AM–4:00 PM"
+function summarizeWorkingHours(member) {
+  const enabled = workingHoursForStaff(member).filter((hours) => hours.enabled);
+  if (enabled.length === 0) return "No working days set";
+  const groups = new Map();
+  enabled.forEach((hours) => {
+    const key = `${hours.startTime}-${hours.endTime}`;
+    groups.set(key, [...(groups.get(key) || []), hours.weekday]);
+  });
+  return [...groups.entries()]
+    .map(([key, days]) => {
+      const runs = [];
+      days.forEach((day) => {
+        const last = runs.at(-1);
+        if (last && day === last.end + 1) last.end = day;
+        else runs.push({ start: day, end: day });
+      });
+      const dayText = runs
+        .map(({ start, end }) =>
+          start === end
+            ? shortWeekday(start)
+            : `${shortWeekday(start)}–${shortWeekday(end)}`,
+        )
+        .join(", ");
+      const [start, end] = key.split("-");
+      return `${dayText} · ${formatClock(start)}–${formatClock(end)}`;
+    })
+    .join("; ");
+}
+
+const sameHours = (first, second) =>
+  JSON.stringify(first) === JSON.stringify(second);
+
 async function fetchStaff(token) {
   const response = await fetch("/api/v1/admin/staff", {
     headers: { Authorization: ["Bearer", token].join(" ") },
@@ -172,10 +218,13 @@ function AdminSchedulePage() {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [staff, setStaff] = useState([]);
   const [staffLoading, setStaffLoading] = useState(user?.role === "admin");
-  const [selectedStaffId, setSelectedStaffId] = useState("");
+  // The staff member whose hours are open in the modal ("" when closed).
+  const [hoursStaffId, setHoursStaffId] = useState("");
   const [workingHours, setWorkingHours] = useState(defaultWorkingHours);
+  const [initialHours, setInitialHours] = useState(defaultWorkingHours);
   const [savingHours, setSavingHours] = useState(false);
-  const [hoursSaved, setHoursSaved] = useState(false);
+  const [hoursError, setHoursError] = useState("");
+  const [confirm, confirmDialog] = useConfirm();
   const [googleCalendar, setGoogleCalendar] = useState({
     connected: false,
     events: [],
@@ -315,16 +364,7 @@ function AdminSchedulePage() {
     let active = true;
     fetchStaff(token)
       .then((members) => {
-        if (active) {
-          const initialStaffId = members[0]?._id || "";
-          setStaff(members);
-          setSelectedStaffId(initialStaffId);
-          setWorkingHours(
-            workingHoursForStaff(
-              members.find((member) => member._id === initialStaffId),
-            ),
-          );
-        }
+        if (active) setStaff(members);
       })
       .catch((requestError) => {
         if (active) {
@@ -407,12 +447,16 @@ function AdminSchedulePage() {
   };
 
   const cancelAppointment = async (appointmentId) => {
-    if (
-      !appointmentId ||
-      !window.confirm("Cancel this appointment? The customer will be notified.")
-    ) {
-      return;
-    }
+    if (!appointmentId) return;
+    const confirmed = await confirm({
+      title: "Cancel this appointment?",
+      description:
+        "The customer is notified right away and the time slot opens up for other bookings. This can't be undone.",
+      confirmLabel: "Cancel appointment",
+      cancelLabel: "Keep appointment",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setBusyId(appointmentId);
     setBusyAction("cancel");
     setError("");
@@ -420,6 +464,7 @@ function AdminSchedulePage() {
     try {
       await cancelStaffAppointment(appointmentId, token);
       setRefreshVersion((version) => version + 1);
+      toast.success("The appointment was cancelled and the customer notified.");
     } catch (requestError) {
       setError(requestError.message || "Could not cancel this appointment.");
     } finally {
@@ -480,23 +525,48 @@ function AdminSchedulePage() {
     );
   };
 
-  const selectStaff = (staffId) => {
-    setSelectedStaffId(staffId);
-    setHoursSaved(false);
-    setWorkingHours(
-      workingHoursForStaff(staff.find((member) => member._id === staffId)),
-    );
+  const openHours = (member) => {
+    const hours = workingHoursForStaff(member);
+    setWorkingHours(hours);
+    setInitialHours(hours);
+    setHoursError("");
+    setHoursStaffId(member._id);
+  };
+
+  const closeHours = async () => {
+    if (savingHours) return;
+    if (
+      !sameHours(workingHours, initialHours) &&
+      !(await confirm({
+        title: "Discard your changes?",
+        description: "The working hours you changed haven't been saved.",
+        confirmLabel: "Discard changes",
+        cancelLabel: "Keep editing",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setHoursStaffId("");
   };
 
   const saveWorkingHours = async (event) => {
     event.preventDefault();
-    if (!selectedStaffId) return;
+    if (!hoursStaffId || savingHours) return;
+    const invalidDay = workingHours.find(
+      (hours) => hours.enabled && hours.startTime >= hours.endTime,
+    );
+    if (invalidDay) {
+      setHoursError(
+        `${weekdayNames[invalidDay.weekday]}: the end time must be later than the start time.`,
+      );
+      return;
+    }
     setSavingHours(true);
-    setError("");
-    setHoursSaved(false);
+    setHoursError("");
     try {
       const response = await fetch(
-        `/api/v1/admin/staff/${selectedStaffId}/working-hours`,
+        `/api/v1/admin/staff/${hoursStaffId}/working-hours`,
         {
           method: "PUT",
           headers: {
@@ -512,12 +582,13 @@ function AdminSchedulePage() {
       }
       setStaff((current) =>
         current.map((member) =>
-          member._id === selectedStaffId ? payload.staff : member,
+          member._id === hoursStaffId ? payload.staff : member,
         ),
       );
-      setHoursSaved(true);
+      setHoursStaffId("");
+      toast.success(`Working hours saved for ${payload.staff?.name || "this team member"}.`);
     } catch (requestError) {
-      setError(requestError.message || "Could not save working hours.");
+      setHoursError(requestError.message || "Could not save working hours.");
     } finally {
       setSavingHours(false);
     }
@@ -530,7 +601,7 @@ function AdminSchedulePage() {
         <title>Manage Schedule | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-dashboard">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Schedule management</p>
@@ -574,104 +645,39 @@ function AdminSchedulePage() {
               <div>
                 <h2 id="admin-schedule-hours-heading">Staff working hours</h2>
                 <p>
-                  Set each team member's weekly availability before assigning
-                  appointments.
+                  Each team member's weekly availability. Bookings are only
+                  offered inside these hours.
                 </p>
               </div>
-              {staffLoading && <span role="status">Loading staff...</span>}
             </div>
-            {staff.length === 0 && !staffLoading ? (
+            {staffLoading ? (
+              <p className="admin-schedule__hours-loading" role="status">
+                Loading staff…
+              </p>
+            ) : staff.length === 0 ? (
               <p className="customer-empty-state">
                 No staff accounts found. Create staff accounts before setting
                 their availability.
               </p>
             ) : (
-              <form
-                className="admin-schedule__hours-form"
-                onSubmit={saveWorkingHours}
-              >
-                <label className="admin-schedule__staff-select">
-                  <span>Staff member</span>
-                  <select
-                    value={selectedStaffId}
-                    onChange={(event) => selectStaff(event.target.value)}
-                    disabled={staffLoading || staff.length === 0}
-                  >
-                    {staff.map((member) => (
-                      <option key={member._id} value={member._id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="admin-schedule__hours-list">
-                  {workingHours.map((hours) => (
-                    <div
-                      className="admin-schedule__hours-row"
-                      key={hours.weekday}
+              <ul className="admin-schedule__hours-summary">
+                {staff.map((member) => (
+                  <li key={member._id}>
+                    <span className="admin-schedule__hours-name">
+                      <strong>{member.name}</strong>
+                      <span>{summarizeWorkingHours(member)}</span>
+                    </span>
+                    <button
+                      className="customer-button customer-button-outline"
+                      type="button"
+                      onClick={() => openHours(member)}
+                      aria-label={`Edit working hours for ${member.name}`}
                     >
-                      <label className="admin-schedule__hours-day">
-                        <input
-                          type="checkbox"
-                          checked={hours.enabled}
-                          onChange={(event) =>
-                            updateWorkingHour(hours.weekday, {
-                              enabled: event.target.checked,
-                            })
-                          }
-                        />
-                        <span>{weekdayNames[hours.weekday]}</span>
-                      </label>
-                      <label className="admin-schedule__time-field">
-                        <span className="admin-dashboard__visually-hidden">
-                          {weekdayNames[hours.weekday]} start time
-                        </span>
-                        <input
-                          type="time"
-                          value={hours.startTime}
-                          disabled={!hours.enabled}
-                          onChange={(event) =>
-                            updateWorkingHour(hours.weekday, {
-                              startTime: event.target.value,
-                            })
-                          }
-                        />
-                      </label>
-                      <span className="admin-schedule__time-separator">to</span>
-                      <label className="admin-schedule__time-field">
-                        <span className="admin-dashboard__visually-hidden">
-                          {weekdayNames[hours.weekday]} end time
-                        </span>
-                        <input
-                          type="time"
-                          value={hours.endTime}
-                          disabled={!hours.enabled}
-                          onChange={(event) =>
-                            updateWorkingHour(hours.weekday, {
-                              endTime: event.target.value,
-                            })
-                          }
-                        />
-                      </label>
-                      {!hours.enabled && (
-                        <span className="admin-schedule__day-off">Day off</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className="customer-button customer-button-primary"
-                  type="submit"
-                  disabled={savingHours || !selectedStaffId}
-                >
-                  {savingHours ? "Saving hours..." : "Save working hours"}
-                </button>
-                {hoursSaved && (
-                  <p className="admin-schedule__hours-saved" role="status">
-                    Working hours saved.
-                  </p>
-                )}
-              </form>
+                      Edit hours
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         )}
@@ -990,7 +996,7 @@ function AdminSchedulePage() {
                                     >
                                       {busyId === appointment._id &&
                                       busyAction === "confirm"
-                                        ? "Confirming..."
+                                        ? "Confirming…"
                                         : "Confirm"}
                                     </button>
                                   )}
@@ -1005,7 +1011,7 @@ function AdminSchedulePage() {
                                   >
                                     {busyId === appointment._id &&
                                     busyAction === "cancel"
-                                      ? "Cancelling..."
+                                      ? "Cancelling…"
                                       : "Cancel"}
                                   </button>
                                 )}
@@ -1052,7 +1058,7 @@ function AdminSchedulePage() {
             )}
             <p className="admin-schedule__calendar-note" aria-live="polite">
               {loading
-                ? "Updating appointments..."
+                ? "Updating appointments…"
                 : `${appointments.length} appointments shown`}
             </p>
           </div>
@@ -1071,7 +1077,7 @@ function AdminSchedulePage() {
               </div>
 
               {loading ? (
-                <p role="status">Loading appointments...</p>
+                <p role="status">Loading appointments…</p>
               ) : selectedAppointments.length === 0 &&
                 selectedGoogleEvents.length === 0 ? (
                 <p className="customer-empty-state">
@@ -1171,7 +1177,7 @@ function AdminSchedulePage() {
                             >
                               {busyId === appointment._id &&
                               busyAction === "confirm"
-                                ? "Confirming..."
+                                ? "Confirming…"
                                 : "Confirm"}
                             </button>
                           )}
@@ -1186,7 +1192,7 @@ function AdminSchedulePage() {
                           >
                             {busyId === appointment._id &&
                             busyAction === "cancel"
-                              ? "Cancelling..."
+                              ? "Cancelling…"
                               : "Cancel"}
                           </button>
                         )}
@@ -1229,6 +1235,118 @@ function AdminSchedulePage() {
           )}
         </section>
       </main>
+      {hoursStaffId && (
+        <Modal onClose={closeHours} size="wide">
+          <Modal.Header>
+            <div>
+              <Modal.Eyebrow>Working hours</Modal.Eyebrow>
+              <Modal.Title>
+                {staff.find((member) => member._id === hoursStaffId)?.name || "Team member"}
+              </Modal.Title>
+              <Modal.Description>
+                Untick a day to mark it as a day off. Times use the salon's
+                local time.
+              </Modal.Description>
+            </div>
+            <Modal.Close label="Close without saving" />
+          </Modal.Header>
+          <Modal.Body>
+            {hoursError && (
+              <p className="admin-note admin-note--error" role="alert">
+                {hoursError}
+              </p>
+            )}
+            <form
+              id="working-hours-form"
+              className="admin-schedule__hours-form"
+              onSubmit={saveWorkingHours}
+            >
+              <div className="admin-schedule__hours-list">
+                {workingHours.map((hours) => (
+                  <div
+                    className={`admin-schedule__hours-row${hours.enabled ? "" : " is-off"}`}
+                    key={hours.weekday}
+                  >
+                    <label className="admin-schedule__hours-day admin-check">
+                      <input
+                        type="checkbox"
+                        checked={hours.enabled}
+                        onChange={(event) =>
+                          updateWorkingHour(hours.weekday, {
+                            enabled: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>{weekdayNames[hours.weekday]}</span>
+                    </label>
+                    {hours.enabled ? (
+                      <>
+                        <label className="admin-schedule__time-field">
+                          <span className="admin-dashboard__visually-hidden">
+                            {weekdayNames[hours.weekday]} start time
+                          </span>
+                          <input
+                            type="time"
+                            value={hours.startTime}
+                            onChange={(event) =>
+                              updateWorkingHour(hours.weekday, {
+                                startTime: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <span className="admin-schedule__time-separator">to</span>
+                        <label className="admin-schedule__time-field">
+                          <span className="admin-dashboard__visually-hidden">
+                            {weekdayNames[hours.weekday]} end time
+                          </span>
+                          <input
+                            type="time"
+                            value={hours.endTime}
+                            onChange={(event) =>
+                              updateWorkingHour(hours.weekday, {
+                                endTime: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <span className="admin-schedule__day-off">Day off</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </form>
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={closeHours}
+              disabled={savingHours}
+            >
+              Cancel
+            </button>
+            <button
+              className="customer-button customer-button-primary"
+              type="submit"
+              form="working-hours-form"
+              disabled={savingHours}
+            >
+              {savingHours ? (
+                <>
+                  <span className="admin-spinner" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : (
+                "Save working hours"
+              )}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+      {confirmDialog}
       {reschedulingAppointment && (
         <StaffRescheduleDialog
           appointment={reschedulingAppointment}

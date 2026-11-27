@@ -5,7 +5,6 @@ import {
   cancelStaffAppointment,
   confirmAppointment,
   createStaffAppointment,
-  createReminderTestAppointments,
   getAvailability,
   getAvailabilityCalendar,
   getStaffAppointment,
@@ -53,7 +52,6 @@ router.post(
   validateBody(createStaffAppointmentSchema),
   createStaffAppointment,
 );
-router.post("/test-reminders", createReminderTestAppointments);
 router.get("/:id", validateParams(appointmentDetailSchema), getStaffAppointment);
 router.patch(
   "/:id/cancel",

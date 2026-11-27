@@ -8,6 +8,7 @@ import {
   getStaffAvailability,
   rescheduleStaffAppointment,
 } from "../../services/bookingApi.js";
+import Modal from "../admin/ui/Modal.jsx";
 
 function dateKey(date) {
   const year = date.getFullYear();
@@ -121,34 +122,21 @@ function StaffRescheduleDialog({
   };
 
   return (
-    <div className="staff-reschedule__backdrop">
-      <section
-        className="staff-reschedule"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="staff-reschedule-title"
-      >
-        <header className="staff-reschedule__header">
-          <div>
-            <p className="customer-eyebrow">Appointment changes</p>
-            <h2 id="staff-reschedule-title">Reschedule appointment</h2>
-            <p>
-              {appointment.customerName || "Customer"} ·{" "}
-              {appointment.serviceName || "Salon service"}
-            </p>
-          </div>
-          <button
-            className="staff-reschedule__close"
-            type="button"
-            onClick={onClose}
-            aria-label="Close reschedule dialog"
-            disabled={saving}
-          >
-            ×
-          </button>
-        </header>
+    <Modal onClose={() => !saving && onClose()} size="wide" className="staff-reschedule-modal">
+      <Modal.Header>
+        <div>
+          <Modal.Eyebrow>Appointment changes</Modal.Eyebrow>
+          <Modal.Title>Reschedule appointment</Modal.Title>
+          <Modal.Description>
+            {appointment.customerName || "Customer"} ·{" "}
+            {appointment.serviceName || "Salon service"}
+          </Modal.Description>
+        </div>
+        <Modal.Close label="Close without rescheduling" />
+      </Modal.Header>
+      <Modal.Body>
+        <form id="staff-reschedule-form" onSubmit={submit}>
 
-        <form onSubmit={submit}>
           <div className="staff-reschedule__current">
             <strong>Current appointment</strong>
             <span>
@@ -216,31 +204,39 @@ function StaffRescheduleDialog({
             )}
           </fieldset>
 
-          <footer className="staff-reschedule__actions">
-            <button
-              className="customer-button customer-button-outline"
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button
-              className="customer-button customer-button-primary"
-              type="submit"
-              disabled={
-                loading ||
-                saving ||
-                !selectedTime ||
-                (date === currentDate && selectedTime === appointment.startTime)
-              }
-            >
-              {saving ? "Saving…" : "Save new time"}
-            </button>
-          </footer>
         </form>
-      </section>
-    </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          className="customer-button customer-button-outline"
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+        >
+          Cancel
+        </button>
+        <button
+          className="customer-button customer-button-primary"
+          type="submit"
+          form="staff-reschedule-form"
+          disabled={
+            loading ||
+            saving ||
+            !selectedTime ||
+            (date === currentDate && selectedTime === appointment.startTime)
+          }
+        >
+          {saving ? (
+            <>
+              <span className="admin-spinner" aria-hidden="true" />
+              Saving…
+            </>
+          ) : (
+            "Save new time"
+          )}
+        </button>
+      </Modal.Footer>
+    </Modal>
   );
 }
 

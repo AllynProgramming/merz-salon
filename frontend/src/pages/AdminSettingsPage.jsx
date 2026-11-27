@@ -5,6 +5,9 @@ import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
+import Modal from "../components/admin/ui/Modal.jsx";
+import useConfirm from "../components/admin/ui/useConfirm.jsx";
+import { toast } from "../components/admin/ui/toast.js";
 
 const initialSettings = {
   emailNotifications: true,
@@ -179,6 +182,31 @@ const toSettingsState = (saved = {}) => ({
   driveEmail: saved.driveEmail || "",
 });
 
+const GOOGLE_PAIR = ["googleClientId", "googleClientSecret"];
+
+// What the credential modal edits: the Google client ID + secret pair, or
+// a single field.
+function findCredentialEditor(editorKey) {
+  if (!editorKey) return null;
+  if (editorKey === "google-auth") {
+    const group = credentialGroups.find(({ key }) => key === "google-auth");
+    return {
+      key: editorKey,
+      title: "Google client ID and secret",
+      group,
+      fields: group.fields.filter(({ key }) => GOOGLE_PAIR.includes(key)),
+      isGooglePair: true,
+    };
+  }
+  for (const group of credentialGroups) {
+    const field = group.fields.find(({ key }) => key === editorKey);
+    if (field) {
+      return { key: editorKey, title: field.label, group, fields: [field], field };
+    }
+  }
+  return null;
+}
+
 async function requestSettings(path, token, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -201,7 +229,8 @@ function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(initialCalendarError);
-  const [notice, setNotice] = useState("");
+  const [credentialError, setCredentialError] = useState("");
+  const [confirm, confirmDialog] = useConfirm();
   const [credentials, setCredentials] = useState({});
   const [credentialValues, setCredentialValues] = useState({});
   const [editingCredential, setEditingCredential] = useState(null);
@@ -299,7 +328,6 @@ function AdminSettingsPage() {
     setSettings(nextSettings);
     setSaving(true);
     setError("");
-    setNotice("");
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(nextSettings).filter(
@@ -313,7 +341,7 @@ function AdminSettingsPage() {
       });
       setSettings(toSettingsState(payload.settings));
       setCredentials(payload.settings.secretsConfigured || {});
-      setNotice("Settings saved.");
+      toast.success("Settings saved.");
     } catch (requestError) {
       setSettings(settings);
       setError(requestError.message);
@@ -325,7 +353,6 @@ function AdminSettingsPage() {
   const saveCredentialValues = async (values, successMessage) => {
     setSaving(true);
     setError("");
-    setNotice("");
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(settings).filter(
@@ -345,9 +372,9 @@ function AdminSettingsPage() {
         return nextValues;
       });
       setEditingCredential(null);
-      setNotice(successMessage);
+      toast.success(successMessage);
     } catch (requestError) {
-      setError(requestError.message);
+      setCredentialError(requestError.message);
     } finally {
       setSaving(false);
     }
@@ -372,16 +399,23 @@ function AdminSettingsPage() {
       (!credentials.googleClientId || !credentials.googleClientSecret) &&
       (!values.googleClientId || !values.googleClientSecret)
     ) {
-      setError("Enter both the Google client ID and client secret.");
+      setCredentialError("Enter both the Google client ID and client secret.");
       return;
     }
     return saveCredentialValues(values, "Google sign-in credentials saved.");
   };
 
   const restoreCredentials = async () => {
+    const confirmed = await confirm({
+      title: "Restore credential defaults?",
+      description:
+        "Every credential saved here (Google sign-in, calendar, email delivery and reCAPTCHA) is removed, and the salon falls back to the server's environment settings. This can't be undone.",
+      confirmLabel: "Restore defaults",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
-    setNotice("");
     try {
       const settingsPayload = Object.fromEntries(
         Object.entries(settings).filter(
@@ -397,12 +431,39 @@ function AdminSettingsPage() {
       setCredentials(payload.settings.secretsConfigured || {});
       setCredentialValues({});
       setEditingCredential(null);
-      setNotice("Credential defaults restored.");
+      toast.success("Credential defaults restored.");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
       setSaving(false);
     }
+  };
+
+  const credentialEditor = findCredentialEditor(editingCredential);
+
+  const closeCredentialEditor = async () => {
+    if (saving || !credentialEditor) return;
+    const typed = credentialEditor.fields.some(
+      ({ key }) => credentialValues[key],
+    );
+    if (
+      typed &&
+      !(await confirm({
+        title: "Discard the new value?",
+        description: "What you typed hasn't been saved.",
+        confirmLabel: "Discard",
+        cancelLabel: "Keep editing",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setCredentialValues((current) => {
+      const next = { ...current };
+      credentialEditor.fields.forEach(({ key }) => delete next[key]);
+      return next;
+    });
+    setEditingCredential(null);
   };
 
   if (!settingsAccessToken) {
@@ -413,7 +474,7 @@ function AdminSettingsPage() {
           <title>Verify settings access | MERZ Beauty Salon</title>
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
-        <main className="customer-container admin-dashboard">
+        <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
           <section className="customer-panel admin-settings-access-panel">
             <p className="customer-eyebrow">Salon control room</p>
             <h1>Verify settings access</h1>
@@ -483,7 +544,7 @@ function AdminSettingsPage() {
         <title>Integrations and Settings | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-dashboard">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon control room</p>
@@ -500,11 +561,6 @@ function AdminSettingsPage() {
         {error && (
           <div className="customer-alert customer-alert-error" role="alert">
             {error}
-          </div>
-        )}
-        {notice && (
-          <div className="customer-alert customer-alert-success" role="status">
-            {notice}
           </div>
         )}
 
@@ -573,8 +629,7 @@ function AdminSettingsPage() {
                         disabled={saving}
                         onClick={async () => {
                           setError("");
-                          setNotice("");
-                          try {
+                                                try {
                             const response = await fetch(
                               item.key === "googleCalendar"
                                 ? "/api/v1/admin/calendar/connect"
@@ -674,13 +729,6 @@ function AdminSettingsPage() {
                     const editorKey = isGoogleCredentialPair
                       ? group.key
                       : field.key;
-                    const editorFields = isGoogleCredentialPair
-                      ? group.fields.filter(({ key }) =>
-                          ["googleClientId", "googleClientSecret"].includes(
-                            key,
-                          ),
-                        )
-                      : [field];
                     const isConfigured = isGoogleCredentialPair
                       ? credentials.googleClientId &&
                         credentials.googleClientSecret
@@ -706,71 +754,17 @@ function AdminSettingsPage() {
                           <button
                             className="admin-credential-edit"
                             type="button"
-                            aria-expanded={editingCredential === editorKey}
-                            aria-controls={`credential-editor-${editorKey}`}
+                            aria-haspopup="dialog"
+                            aria-label={`Edit ${isGoogleCredentialPair ? "Google client ID and secret" : field.label}`}
                             disabled={saving}
-                            onClick={() =>
-                              setEditingCredential((current) =>
-                                current === editorKey ? null : editorKey,
-                              )
-                            }
+                            onClick={() => {
+                              setCredentialError("");
+                              setEditingCredential(editorKey);
+                            }}
                           >
-                            {editingCredential === editorKey ? "Close" : "Edit"}
+                            {isConfigured ? "Replace" : "Set up"}
                           </button>
                         </div>
-                        {editingCredential === editorKey && (
-                          <div
-                            className="admin-credential-editor"
-                            id={`credential-editor-${editorKey}`}
-                          >
-                            {editorFields.map((editorField) => (
-                              <label
-                                className="admin-settings-field"
-                                key={editorField.key}
-                              >
-                                <span>New value for {editorField.label}</span>
-                                <input
-                                  type={editorField.type}
-                                  value={
-                                    credentialValues[editorField.key] || ""
-                                  }
-                                  placeholder={
-                                    credentials[editorField.key]
-                                      ? "Enter a new value to replace the current one"
-                                      : "Enter a value"
-                                  }
-                                  autoComplete="new-password"
-                                  onChange={(event) =>
-                                    setCredentialValues((current) => ({
-                                      ...current,
-                                      [editorField.key]: event.target.value,
-                                    }))
-                                  }
-                                />
-                              </label>
-                            ))}
-                            <button
-                              className="customer-button customer-button-primary"
-                              type="button"
-                              disabled={
-                                saving ||
-                                (isGoogleCredentialPair
-                                  ? !credentialValues.googleClientId &&
-                                    !credentialValues.googleClientSecret
-                                  : !credentialValues[field.key])
-                              }
-                              onClick={() =>
-                                isGoogleCredentialPair
-                                  ? saveGoogleCredentials()
-                                  : saveCredential(field)
-                              }
-                            >
-                              {isGoogleCredentialPair
-                                ? "Save Google credentials"
-                                : `Save ${field.label}`}
-                            </button>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -780,6 +774,99 @@ function AdminSettingsPage() {
           </div>
         </section>
       </main>
+      {credentialEditor && (
+        <Modal onClose={closeCredentialEditor}>
+          <Modal.Header>
+            <div>
+              <Modal.Eyebrow>{credentialEditor.group.title}</Modal.Eyebrow>
+              <Modal.Title>{credentialEditor.title}</Modal.Title>
+              <Modal.Description>
+                {credentialEditor.fields.some(({ key }) => credentials[key])
+                  ? "The current value is stored encrypted and never shown. Enter a new value to replace it."
+                  : credentialEditor.group.description}
+              </Modal.Description>
+            </div>
+            <Modal.Close label="Close without saving" />
+          </Modal.Header>
+          <Modal.Body>
+            {credentialError && (
+              <p className="admin-note admin-note--error" role="alert">
+                {credentialError}
+              </p>
+            )}
+            <form
+              id="credential-form"
+              className="admin-form admin-form--single"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (credentialEditor.isGooglePair) saveGoogleCredentials();
+                else saveCredential(credentialEditor.field);
+              }}
+            >
+              {credentialEditor.fields.map((editorField, index) => (
+                <label className="admin-field" key={editorField.key}>
+                  {editorField.label}
+                  <input
+                    name={editorField.key}
+                    type={editorField.type}
+                    value={credentialValues[editorField.key] || ""}
+                    placeholder={
+                      credentials[editorField.key] || settings[editorField.key]
+                        ? "Enter a new value to replace the current one…"
+                        : editorField.type === "url"
+                          ? "https://…"
+                          : "Enter a value…"
+                    }
+                    autoComplete={
+                      editorField.type === "password" ? "new-password" : "off"
+                    }
+                    spellCheck={false}
+                    data-autofocus={index === 0 ? true : undefined}
+                    onChange={(event) => {
+                      setCredentialError("");
+                      setCredentialValues((current) => ({
+                        ...current,
+                        [editorField.key]: event.target.value,
+                      }));
+                    }}
+                  />
+                </label>
+              ))}
+            </form>
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={closeCredentialEditor}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="customer-button customer-button-primary"
+              type="submit"
+              form="credential-form"
+              disabled={
+                saving ||
+                !credentialEditor.fields.some(
+                  ({ key }) => credentialValues[key],
+                )
+              }
+            >
+              {saving ? (
+                <>
+                  <span className="admin-spinner" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : (
+                "Save"
+              )}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+      {confirmDialog}
     </div>
   );
 }

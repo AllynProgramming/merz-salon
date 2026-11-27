@@ -41,6 +41,11 @@ function customerName(customer) {
   );
 }
 
+const ratingFormat = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 function AdminFeedbackPage() {
   const { token } = useAuth();
   const [items, setItems] = useState([]);
@@ -98,7 +103,7 @@ function AdminFeedbackPage() {
         <title>Customer Feedback | MERZ Beauty Salon</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <main className="customer-container admin-dashboard">
+      <main id="admin-main" tabIndex={-1} className="customer-container admin-dashboard">
         <header className="customer-page-heading admin-section-heading">
           <div>
             <p className="customer-eyebrow">Salon operations</p>
@@ -126,12 +131,12 @@ function AdminFeedbackPage() {
             <p className="customer-eyebrow">Overall customer rating</p>
             {hasRatings ? (
               <div className="admin-feedback__average">
-                <strong>{summary.averageRating.toFixed(1)}</strong>
+                <strong>{ratingFormat.format(summary.averageRating)}</strong>
                 <StarRating value={summary.averageRating} />
               </div>
             ) : (
               <strong className="admin-feedback__no-rating">
-                {loading ? "Loading ratings..." : "No ratings yet"}
+                {loading ? "Loading ratings…" : "No ratings yet"}
               </strong>
             )}
           </div>
@@ -147,7 +152,7 @@ function AdminFeedbackPage() {
           </div>
 
           {loading ? (
-            <p role="status">Loading customer feedback...</p>
+            <p role="status">Loading customer feedback…</p>
           ) : items.length === 0 ? (
             <p className="customer-empty-state">
               No customer feedback has been submitted yet.
