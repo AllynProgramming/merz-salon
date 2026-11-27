@@ -167,6 +167,18 @@ const isConnectionMetadata = (key) =>
     "driveEmail",
   ].includes(key);
 
+// The page's copy of the settings, built from what the server returns.
+const toSettingsState = (saved = {}) => ({
+  ...initialSettings,
+  ...Object.fromEntries(
+    Object.entries(saved).filter(([key]) => !isConnectionMetadata(key)),
+  ),
+  calendarConnected: Boolean(saved.calendarConnected),
+  calendarEmail: saved.calendarEmail || "",
+  driveConnected: Boolean(saved.driveConnected),
+  driveEmail: saved.driveEmail || "",
+});
+
 async function requestSettings(path, token, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -267,19 +279,7 @@ function AdminSettingsPage() {
     })
       .then((payload) => {
         if (active) {
-          const savedSettings = Object.fromEntries(
-          Object.entries(payload.settings).filter(
-            ([key]) => !isConnectionMetadata(key),
-          ),
-          );
-          setSettings({
-            ...initialSettings,
-            ...savedSettings,
-            calendarConnected: Boolean(payload.settings.calendarConnected),
-            calendarEmail: payload.settings.calendarEmail || "",
-            driveConnected: Boolean(payload.settings.driveConnected),
-            driveEmail: payload.settings.driveEmail || "",
-          });
+          setSettings(toSettingsState(payload.settings));
           setCredentials(payload.settings.secretsConfigured || {});
         }
       })
@@ -311,19 +311,7 @@ function AdminSettingsPage() {
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify(settingsPayload),
       });
-      const savedSettings = Object.fromEntries(
-        Object.entries(payload.settings).filter(
-          ([key]) => !isConnectionMetadata(key),
-        ),
-      );
-      setSettings({
-        ...initialSettings,
-        ...savedSettings,
-        calendarConnected: Boolean(payload.settings.calendarConnected),
-        calendarEmail: payload.settings.calendarEmail || "",
-        driveConnected: Boolean(payload.settings.driveConnected),
-        driveEmail: payload.settings.driveEmail || "",
-      });
+      setSettings(toSettingsState(payload.settings));
       setCredentials(payload.settings.secretsConfigured || {});
       setNotice("Settings saved.");
     } catch (requestError) {
@@ -349,6 +337,7 @@ function AdminSettingsPage() {
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, ...values }),
       });
+      setSettings(toSettingsState(payload.settings));
       setCredentials(payload.settings.secretsConfigured || {});
       setCredentialValues((current) => {
         const nextValues = { ...current };
@@ -404,6 +393,7 @@ function AdminSettingsPage() {
         headers: { "X-Settings-Access-Token": settingsAccessToken },
         body: JSON.stringify({ ...settingsPayload, resetCredentials: true }),
       });
+      setSettings(toSettingsState(payload.settings));
       setCredentials(payload.settings.secretsConfigured || {});
       setCredentialValues({});
       setEditingCredential(null);
@@ -694,7 +684,11 @@ function AdminSettingsPage() {
                     const isConfigured = isGoogleCredentialPair
                       ? credentials.googleClientId &&
                         credentials.googleClientSecret
-                      : credentials[field.key];
+                      : // Secrets are reported in secretsConfigured; plain
+                        // settings like the calendar embed URL are not.
+                        Object.hasOwn(credentials, field.key)
+                        ? credentials[field.key]
+                        : Boolean(settings[field.key]);
 
                     return (
                       <div className="admin-credential-item" key={field.key}>
