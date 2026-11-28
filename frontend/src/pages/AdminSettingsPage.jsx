@@ -5,9 +5,9 @@ import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
-import Modal from "../components/admin/ui/Modal.jsx";
-import useConfirm from "../components/admin/ui/useConfirm.jsx";
-import { toast } from "../components/admin/ui/toast.js";
+import Modal from "../components/ui/Modal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 
 const initialSettings = {
   emailNotifications: true,
@@ -790,13 +790,13 @@ function AdminSettingsPage() {
           </Modal.Header>
           <Modal.Body>
             {credentialError && (
-              <p className="admin-note admin-note--error" role="alert">
+              <p className="ui-note ui-note--error" role="alert">
                 {credentialError}
               </p>
             )}
             <form
               id="credential-form"
-              className="admin-form admin-form--single"
+              className="ui-form ui-form--single"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (credentialEditor.isGooglePair) saveGoogleCredentials();
@@ -804,7 +804,7 @@ function AdminSettingsPage() {
               }}
             >
               {credentialEditor.fields.map((editorField, index) => (
-                <label className="admin-field" key={editorField.key}>
+                <label className="ui-field" key={editorField.key}>
                   {editorField.label}
                   <input
                     name={editorField.key}
@@ -856,7 +856,7 @@ function AdminSettingsPage() {
             >
               {saving ? (
                 <>
-                  <span className="admin-spinner" aria-hidden="true" />
+                  <span className="ui-spinner" aria-hidden="true" />
                   Saving…
                 </>
               ) : (

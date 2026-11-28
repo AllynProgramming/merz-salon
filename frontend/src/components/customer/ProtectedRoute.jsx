@@ -9,7 +9,7 @@ function ProtectedRoute({ allowedRoles = ["customer"] }) {
   if (isRestoring) {
     return (
       <main className="customer-route-loading" aria-busy="true">
-        <p role="status">Loading your account...</p>
+        <p role="status">Loading your account…</p>
       </main>
     );
   }

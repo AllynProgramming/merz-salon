@@ -223,7 +223,7 @@ function UserMenu() {
               </div>
 
               {loadingNotifications ? (
-                <p className="salon-notification-empty">Loading reminders...</p>
+                <p className="salon-notification-empty">Loading reminders…</p>
               ) : notifications.length === 0 ? (
                 <p className="salon-notification-empty">
                   No notifications yet. Your appointment reminders will appear
@@ -339,7 +339,7 @@ function UserMenu() {
             disabled={loggingOut}
             onClick={handleLogout}
           >
-            {loggingOut ? "Logging out..." : "Log Out"}
+            {loggingOut ? "Logging out…" : "Log Out"}
           </button>
         </div>
       )}

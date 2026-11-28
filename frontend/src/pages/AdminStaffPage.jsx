@@ -4,9 +4,9 @@ import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
-import Modal from "../components/admin/ui/Modal.jsx";
-import useConfirm from "../components/admin/ui/useConfirm.jsx";
-import { toast } from "../components/admin/ui/toast.js";
+import Modal from "../components/ui/Modal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import StaffForm from "../components/admin/StaffForm.jsx";
 import {
   emptyStaffForm,
@@ -247,7 +247,7 @@ function AdminStaffPage() {
           <div className="admin-staff__list-heading">
             <div>
               <h2 id="admin-staff-list-heading">Your team</h2>
-              <p className="admin-tabular">
+              <p className="ui-tabular">
                 {loading
                   ? "Loading…"
                   : staff.length === 0
@@ -323,7 +323,7 @@ function AdminStaffPage() {
                     >
                       {resettingId === member._id ? (
                         <>
-                          <span className="admin-spinner" aria-hidden="true" />
+                          <span className="ui-spinner" aria-hidden="true" />
                           Resetting…
                         </>
                       ) : (
@@ -358,7 +358,7 @@ function AdminStaffPage() {
           </Modal.Header>
           <Modal.Body>
             {modalError && (
-              <p className="admin-note admin-note--error" role="alert">
+              <p className="ui-note ui-note--error" role="alert">
                 {modalError}
               </p>
             )}
@@ -389,7 +389,7 @@ function AdminStaffPage() {
             >
               {saving ? (
                 <>
-                  <span className="admin-spinner" aria-hidden="true" />
+                  <span className="ui-spinner" aria-hidden="true" />
                   {modal.mode === "edit" ? "Saving…" : "Creating…"}
                 </>
               ) : modal.mode === "edit" ? (

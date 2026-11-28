@@ -1,24 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import {
-  Link,
   useBlocker,
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
 import Navbar from "../components/landing/Navbar.jsx";
 import DatePicker from "../components/booking/DatePicker.jsx";
-import StarRating from "../components/customer/StarRating.jsx";
 import {
   BookingSummary,
+  ServiceDuration,
+  ServiceFilters,
+  ServiceRating,
   Stepper,
   TimeSlotGrid,
-  Toast,
 } from "../components/booking/BookingComponents.jsx";
+import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import {
   formatDate,
-  formatDuration,
   formatPrice,
+  formatTime,
+  isMostLoved,
 } from "../components/booking/bookingUtils.js";
 import useAuth from "../context/useAuth.js";
 import {
@@ -30,7 +32,9 @@ import {
 import { bookingSchedule } from "../config/bookingSchedule.js";
 import "../styles/booking.css";
 
-const steps = ["Service", "Date", "Time", "Review", "Confirmation"];
+const steps = ["Service", "Date & time", "Review", "Confirmation"];
+const REVIEW_STEP = 2;
+
 
 function localDateKey(date) {
   const year = date.getFullYear();
@@ -71,6 +75,9 @@ function BookingPage() {
   const [slotRetry, setSlotRetry] = useState(0);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceCategory, setServiceCategory] = useState("All");
+  const timesRef = useRef(null);
   const selectedService = services.find((service) => service._id === serviceId);
   const dirty = Boolean(serviceId || date || slot);
   const allowNavigation = useRef(false);
@@ -162,18 +169,10 @@ function BookingPage() {
     };
   }, [serviceId, date, token, slotRetry]);
 
-  useEffect(() => {
-    if (blockerState !== "blocked") return;
-    if (
-      window.confirm(
-        "Leave this booking? Your selected service, date, and time will be lost.",
-      )
-    )
-      proceed();
-    else reset();
-  }, [blockerState, proceed, reset]);
 
   const chooseService = (service) => {
+    goToStep(1);
+    if (service._id === serviceId) return;
     setServiceId(service._id);
     setDateAvailability(null);
     setCalendarLoading(true);
@@ -192,6 +191,16 @@ function BookingPage() {
     setSelectedStaffId("");
     setSlotsLoading(true);
     setSlotsError("");
+    setError("");
+    // Bring the times into view, which matters most on small screens.
+    window.requestAnimationFrame(() =>
+      timesRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      }),
+    );
   };
 
   const refreshSlots = () => {
@@ -207,26 +216,62 @@ function BookingPage() {
     setCalendarRetry((value) => value + 1);
   };
 
+  const goToStep = (target) => {
+    setError("");
+    // Coming back to the calendar reloads which dates are open.
+    if (target === 1 && step !== 1) {
+      setDateAvailability(null);
+      setCalendarLoading(true);
+      setCalendarError("");
+    }
+    setStep(target);
+    window.scrollTo({ top: 0 });
+  };
+
   const next = () => {
     setError("");
     if (step === 0 && !selectedService)
       return setError("Choose a service to continue.");
     if (step === 1 && !date)
       return setError("Choose an available date to continue.");
-    if (step === 2 && !slot?.available)
+    if (step === 1 && !slot?.available)
       return setError("Choose an available time to continue.");
-    setStep((value) => Math.min(value + 1, 3));
+    goToStep(Math.min(step + 1, REVIEW_STEP));
   };
 
-  const back = () => {
-    setError("");
-    if (step === 2) {
-      setDateAvailability(null);
-      setCalendarLoading(true);
-      setCalendarError("");
-    }
-    setStep((value) => Math.max(value - 1, 0));
-  };
+  const back = () => goToStep(Math.max(step - 1, 0));
+
+  const serviceCategories = useMemo(
+    () =>
+      [...new Set(services.map((service) => service.category || "Other"))].sort(),
+    [services],
+  );
+  const serviceQuery = serviceSearch.trim().toLowerCase();
+  const searchedServices = services.filter(
+    (service) =>
+      !serviceQuery ||
+      `${service.name} ${service.description || ""} ${service.category || ""}`
+        .toLowerCase()
+        .includes(serviceQuery),
+  );
+  const serviceCounts = searchedServices.reduce(
+    (totals, service) => {
+      const key = service.category || "Other";
+      totals[key] = (totals[key] || 0) + 1;
+      return totals;
+    },
+    { All: searchedServices.length },
+  );
+  const pickableServices = searchedServices
+    .filter(
+      (service) =>
+        serviceCategory === "All" ||
+        (service.category || "Other") === serviceCategory,
+    )
+    .sort((first, second) => first.name.localeCompare(second.name));
+  const selectedStaff = slot?.availableStaff?.find(
+    (staff) => String(staff._id) === selectedStaffId,
+  );
 
   const confirmBooking = async () => {
     setSubmitLoading(true);
@@ -247,7 +292,7 @@ function BookingPage() {
       });
     } catch (requestError) {
       if (requestError.status === 409) {
-        setStep(2);
+        setStep(1);
         setSlot(null);
         setSlotsLoading(true);
         setSlotRetry((value) => value + 1);
@@ -270,19 +315,30 @@ function BookingPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="booking-container">
+      <main id="main-content" tabIndex={-1} className="booking-container">
         <header className="booking-header">
           <div>
             <p className="booking-eyebrow">Appointment booking</p>
-            <h1>Choose a time for you</h1>
+            <h1>Book your visit</h1>
             <p className="booking-lede">
-              Select a service, date, and available time, then review the
-              details.
+              Choose a service, pick a time that suits you, and confirm. It
+              takes about a minute.
             </p>
           </div>
         </header>
         <Stepper steps={steps} currentStep={step} />
-        <Toast message={error} variant="error" onDismiss={() => setError("")} />
+        {error && (
+          <div className="booking-form-error" role="alert">
+            <span>{error}</span>
+            <button
+              type="button"
+              aria-label="Dismiss message"
+              onClick={() => setError("")}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {servicesError ? (
           <div className="booking-state booking-state-error" role="alert">
@@ -293,16 +349,16 @@ function BookingPage() {
           </div>
         ) : servicesLoading ? (
           <div className="booking-state" role="status" aria-busy="true">
-            Loading services...
+            Loading services…
           </div>
         ) : (
           <div className="booking-step-layout">
-            <section className="booking-panel" aria-live="polite">
+            <section className="booking-panel">
               {step === 0 && (
                 <>
                   <h2>Select a service</h2>
                   <p className="booking-panel-intro">
-                    Choose one service to see appointment times.
+                    Tap a service to see the days and times it’s available.
                   </p>
                   {!services.length ? (
                     <div className="booking-state">
@@ -310,54 +366,95 @@ function BookingPage() {
                       <p>There are no active services to book right now.</p>
                     </div>
                   ) : (
-                    <div className="booking-service-grid">
-                      {services.map((service) => (
-                        <button
-                          className={`booking-service-card is-compact ${serviceId === service._id ? "booking-selected-card" : ""}`}
-                          type="button"
-                          aria-pressed={serviceId === service._id}
-                          onClick={() => chooseService(service)}
-                          key={service._id}
-                        >
-                          <span className="booking-service-topline">
-                            <span className="booking-category-label">
-                              {service.category || "Service"}
-                            </span>
-                            <span className="booking-duration">
-                              {formatDuration(service.durationMinutes)}
-                            </span>
-                          </span>
-                          <h3>{service.name}</h3>
-                          <p className="booking-service-description">
-                            {service.description}
-                          </p>
-                          <div className="booking-service-meta">
-                            {Number(service.ratingCount) > 0 ? (
-                              <>
-                                <StarRating value={service.averageRating} />
-                                <small>
-                                  {Number(service.averageRating).toFixed(1)} (
-                                  {service.ratingCount})
-                                </small>
-                              </>
-                            ) : (
-                              <small>No ratings yet</small>
-                            )}
-                          </div>
-                          <strong>{formatPrice(service.price)}</strong>
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <ServiceFilters
+                        categories={serviceCategories}
+                        counts={serviceCounts}
+                        category={serviceCategory}
+                        onCategory={setServiceCategory}
+                        search={serviceSearch}
+                        onSearch={setServiceSearch}
+                      />
+                      {pickableServices.length ? (
+                        <div className="booking-service-grid booking-service-grid--pick">
+                          {pickableServices.map((service) => {
+                            const selected = serviceId === service._id;
+                            return (
+                              <button
+                                className={`booking-service-card is-compact${selected ? " booking-selected-card" : ""}`}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => chooseService(service)}
+                                key={service._id}
+                              >
+                                <span className="booking-service-topline">
+                                  <span className="booking-category-label">
+                                    {service.category || "Service"}
+                                  </span>
+                                  {selected ? (
+                                    <span
+                                      className="booking-service-check"
+                                      aria-hidden="true"
+                                    >
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    isMostLoved(service) && (
+                                      <span className="booking-service-badge">
+                                        Most loved
+                                      </span>
+                                    )
+                                  )}
+                                </span>
+                                <span className="booking-service-pick-name">
+                                  {service.name}
+                                </span>
+                                {service.description && (
+                                  <span className="booking-service-description">
+                                    {service.description}
+                                  </span>
+                                )}
+                                <span className="booking-service-facts">
+                                  <ServiceDuration
+                                    minutes={service.durationMinutes}
+                                  />
+                                  <ServiceRating service={service} />
+                                </span>
+                                <strong className="booking-service-price">
+                                  {formatPrice(service.price)}
+                                </strong>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="booking-pick-empty">
+                          <p>No services match “{serviceSearch.trim()}”.</p>
+                          <button
+                            className="booking-button booking-button-outline"
+                            type="button"
+                            onClick={() => {
+                              setServiceSearch("");
+                              setServiceCategory("All");
+                            }}
+                          >
+                            Show all services
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
+
               {step === 1 && (
                 <>
-                  <h2>Select a date</h2>
+                  <h2>Pick a date and time</h2>
                   <p className="booking-panel-intro">
-                    Available dates and times reflect staff schedules and
-                    existing bookings for{" "}
-                    {selectedService?.name || "your service"}.
+                    Days with open times for{" "}
+                    <strong>{selectedService?.name || "your service"}</strong>{" "}
+                    are selectable. Times reflect staff schedules and existing
+                    bookings.
                   </p>
                   {selectedService ? (
                     <>
@@ -382,92 +479,145 @@ function BookingPage() {
                           </button>
                         </div>
                       )}
+                      <div
+                        className="booking-slot-section booking-times"
+                        ref={timesRef}
+                      >
+                        <h3>
+                          {date
+                            ? `Open times on ${formatDate(date)}`
+                            : "Open times"}
+                        </h3>
+                        {date ? (
+                          <TimeSlotGrid
+                            slots={slots}
+                            selectedTime={slot?.startTime}
+                            onSelect={(nextSlot) => {
+                              setError("");
+                              setSlot(nextSlot);
+                              setSelectedStaffId(
+                                (currentStaffId) =>
+                                  nextSlot.availableStaff?.some(
+                                    (staff) =>
+                                      String(staff._id) === currentStaffId,
+                                  )
+                                    ? currentStaffId
+                                    : String(
+                                        nextSlot.availableStaff?.[0]?._id || "",
+                                      ),
+                              );
+                            }}
+                            loading={slotsLoading}
+                            error={slotsError}
+                            onRetry={refreshSlots}
+                          />
+                        ) : (
+                          <p className="booking-times-hint">
+                            Choose a day on the calendar to see its open times.
+                          </p>
+                        )}
+                        {slot?.available && slot.availableStaff?.length > 0 && (
+                          <label className="booking-staff-choice">
+                            <span>Preferred staff member</span>
+                            <select
+                              value={selectedStaffId}
+                              onChange={(event) =>
+                                setSelectedStaffId(event.target.value)
+                              }
+                            >
+                              {slot.availableStaff.map((staff) => (
+                                <option key={staff._id} value={staff._id}>
+                                  {staff.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <div className="booking-state booking-state-error">
                       That service is no longer available.{" "}
-                      <Link to="/services">Choose another service</Link>.
+                      <button
+                        className="booking-text-link"
+                        type="button"
+                        onClick={() => goToStep(0)}
+                      >
+                        Choose another service
+                      </button>
+                      .
                     </div>
                   )}
                 </>
               )}
-              {step === 2 && (
-                <>
-                  <h2>Select a time</h2>
-                  <p className="booking-panel-intro">
-                    {date ? formatDate(date) : "Choose a date first."}
-                  </p>
-                  <TimeSlotGrid
-                    slots={slots}
-                    selectedTime={slot?.startTime}
-                    onSelect={(nextSlot) => {
-                      setSlot(nextSlot);
-                      setSelectedStaffId(
-                        (currentStaffId) =>
-                          nextSlot.availableStaff?.some(
-                            (staff) => String(staff._id) === currentStaffId,
-                          )
-                            ? currentStaffId
-                            : String(nextSlot.availableStaff?.[0]?._id || ""),
-                      );
-                    }}
-                    loading={slotsLoading}
-                    error={slotsError}
-                    onRetry={refreshSlots}
-                  />
-                  {slot?.available && slot.availableStaff?.length > 0 && (
-                    <label className="booking-staff-choice">
-                      <span>Preferred staff member</span>
-                      <select
-                        value={selectedStaffId}
-                        onChange={(event) =>
-                          setSelectedStaffId(event.target.value)
-                        }
-                      >
-                        {slot.availableStaff.map((staff) => (
-                          <option key={staff._id} value={staff._id}>
-                            {staff.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </>
-              )}
-              {step === 3 && (
+
+              {step === REVIEW_STEP && (
                 <>
                   <h2>Review and confirm</h2>
                   <p className="booking-panel-intro">
-                    Check your appointment details before confirming.
+                    Check the details, then confirm your booking.
                   </p>
-                  <BookingSummary
-                    service={selectedService}
-                    date={date}
-                    startTime={slot?.startTime}
-                    endTime={slot?.endTime}
-                  />
-                  {slot?.availableStaff?.find(
-                    (staff) => String(staff._id) === selectedStaffId,
-                  )?.name && (
-                    <p className="booking-review-note">
-                      Preferred staff member:{" "}
-                      <strong>
-                        {
-                          slot.availableStaff.find(
-                            (staff) => String(staff._id) === selectedStaffId,
-                          ).name
-                        }
-                      </strong>
-                    </p>
-                  )}
+                  <dl className="booking-review-list">
+                    <div>
+                      <dt>Service</dt>
+                      <dd>
+                        <strong>{selectedService?.name}</strong>
+                        <span>
+                          {selectedService &&
+                            `${formatPrice(selectedService.price)} · `}
+                          <ServiceDuration
+                            minutes={selectedService?.durationMinutes}
+                          />
+                        </span>
+                      </dd>
+                      <button type="button" onClick={() => goToStep(0)}>
+                        Edit
+                        <span className="booking-visually-hidden"> service</span>
+                      </button>
+                    </div>
+                    <div>
+                      <dt>Date and time</dt>
+                      <dd>
+                        <strong>{date ? formatDate(date) : "—"}</strong>
+                        <span>
+                          {slot
+                            ? `${formatTime(slot.startTime)}${slot.endTime ? `–${formatTime(slot.endTime)}` : ""}`
+                            : ""}
+                        </span>
+                      </dd>
+                      <button type="button" onClick={() => goToStep(1)}>
+                        Edit
+                        <span className="booking-visually-hidden">
+                          {" "}
+                          date and time
+                        </span>
+                      </button>
+                    </div>
+                    {selectedStaff && (
+                      <div>
+                        <dt>Staff member</dt>
+                        <dd>
+                          <strong>{selectedStaff.name}</strong>
+                        </dd>
+                        <button type="button" onClick={() => goToStep(1)}>
+                          Edit
+                          <span className="booking-visually-hidden">
+                            {" "}
+                            staff member
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </dl>
                   <p className="booking-review-note">
-                    Your request stays pending while staff confirms it. If
-                    you’re running late, contact the salon so they can help
-                    with your booking.
+                    Your request stays pending until the salon confirms it.
+                    You’ll get a notification when it’s confirmed. Running late?
+                    Contact the salon so they can help.
                   </p>
                 </>
               )}
-              <div className="booking-action-row">
+
+              <div className="booking-action-row booking-action-row--sticky">
                 <button
                   className="booking-button booking-button-outline"
                   type="button"
@@ -476,18 +626,17 @@ function BookingPage() {
                 >
                   Back
                 </button>
-                {step < 3 ? (
+                {step < REVIEW_STEP ? (
                   <button
                     className="booking-button booking-button-primary"
                     type="button"
                     onClick={next}
                     disabled={
                       (step === 0 && !selectedService) ||
-                      (step === 1 && !date) ||
-                      (step === 2 && (!slot?.available || slotsLoading))
+                      (step === 1 && (!slot?.available || slotsLoading))
                     }
                   >
-                    Next
+                    {step === 0 ? "Choose Date & Time" : "Review Booking"}
                   </button>
                 ) : (
                   <button
@@ -499,13 +648,13 @@ function BookingPage() {
                     {submitLoading && (
                       <span className="booking-spinner" aria-hidden="true" />
                     )}
-                    {submitLoading ? "Confirming..." : "Confirm Booking"}
+                    {submitLoading ? "Confirming…" : "Confirm Booking"}
                   </button>
                 )}
               </div>
             </section>
             <aside
-              className="booking-summary-panel"
+              className="booking-summary-panel booking-summary-panel--sticky"
               aria-label="Booking summary"
             >
               <h2>Your selection</h2>
@@ -519,6 +668,17 @@ function BookingPage() {
           </div>
         )}
       </main>
+      {blockerState === "blocked" && (
+        <ConfirmDialog
+          title="Leave this booking?"
+          description="Your selected service, date and time will be lost."
+          confirmLabel="Leave Booking"
+          cancelLabel="Keep Booking"
+          tone="danger"
+          onConfirm={proceed}
+          onCancel={reset}
+        />
+      )}
     </div>
   );
 }

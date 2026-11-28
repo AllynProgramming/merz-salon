@@ -131,14 +131,14 @@ function BookingConfirmationPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="booking-container">
+      <main id="main-content" tabIndex={-1} className="booking-container">
         <Stepper
           steps={["Service", "Date", "Time", "Review", "Confirmation"]}
           currentStep={4}
         />
         {loading ? (
           <div className="booking-state" role="status" aria-busy="true">
-            Loading your confirmation...
+            Loading your confirmation…
           </div>
         ) : error && !appointment ? (
           <div className="booking-state booking-state-error" role="alert">

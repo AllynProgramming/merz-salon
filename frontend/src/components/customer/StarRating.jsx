@@ -1,5 +1,10 @@
 import { useRef, useState } from "react";
 
+const ratingFormat = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 function StarRating({
   value = 0,
   onChange,
@@ -16,7 +21,7 @@ function StarRating({
       <span
         className="customer-star-display"
         role="img"
-        aria-label={`${rating.toFixed(1)} out of 5 stars`}
+        aria-label={`${ratingFormat.format(rating)} out of 5 stars`}
       >
         {Array.from({ length: 5 }, (_, index) => {
           const difference = rating - index;

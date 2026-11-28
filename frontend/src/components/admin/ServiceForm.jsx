@@ -13,8 +13,8 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
     });
 
   return (
-    <form id={id} className="admin-form" onSubmit={onSubmit}>
-      <label className="admin-field admin-field--full">
+    <form id={id} className="ui-form" onSubmit={onSubmit}>
+      <label className="ui-field ui-field--full">
         Service name
         <input
           name="name"
@@ -28,7 +28,7 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
           data-autofocus
         />
       </label>
-      <label className="admin-field">
+      <label className="ui-field">
         Category
         <input
           name="category"
@@ -47,7 +47,7 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
           </datalist>
         )}
       </label>
-      <label className="admin-field">
+      <label className="ui-field">
         Duration (minutes)
         <input
           name="durationMinutes"
@@ -63,9 +63,9 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
           required
         />
       </label>
-      <div className="admin-field">
+      <div className="ui-field">
         <label htmlFor={`${id}-price`}>Price</label>
-        <div className="admin-field__prefix">
+        <div className="ui-field__prefix">
           <span aria-hidden="true">₱</span>
           <input
             id={`${id}-price`}
@@ -83,7 +83,7 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
           />
         </div>
       </div>
-      <label className="admin-check admin-services__price-varies">
+      <label className="ui-check admin-services__price-varies">
         <input
           name="priceVaries"
           type="checkbox"
@@ -92,7 +92,7 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
         />
         Price varies (quoted at the salon)
       </label>
-      <label className="admin-field admin-field--full">
+      <label className="ui-field ui-field--full">
         Description
         <textarea
           name="description"
@@ -103,7 +103,7 @@ function ServiceForm({ id, form, onChange, onSubmit, categories = [] }) {
           maxLength="1000"
           rows="3"
         />
-        <span className="admin-field__hint">
+        <span className="ui-field__hint">
           {form.description.length}/1000 characters. Shown to customers when
           they book.
         </span>

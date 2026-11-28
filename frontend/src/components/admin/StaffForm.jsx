@@ -9,8 +9,8 @@ function StaffForm({ id, form, onChange, onSubmit }) {
     onChange({ ...form, [field]: event.target.value });
 
   return (
-    <form id={id} className="admin-form" onSubmit={onSubmit}>
-      <label className="admin-field admin-field--full">
+    <form id={id} className="ui-form" onSubmit={onSubmit}>
+      <label className="ui-field ui-field--full">
         Full name
         <input
           name="name"
@@ -24,7 +24,7 @@ function StaffForm({ id, form, onChange, onSubmit }) {
           data-autofocus
         />
       </label>
-      <label className="admin-field">
+      <label className="ui-field">
         Email address
         <input
           name="email"
@@ -38,9 +38,9 @@ function StaffForm({ id, form, onChange, onSubmit }) {
           maxLength="254"
           required
         />
-        <span className="admin-field__hint">Used to sign in.</span>
+        <span className="ui-field__hint">Used to sign in.</span>
       </label>
-      <label className="admin-field">
+      <label className="ui-field">
         Phone number
         <input
           name="phone"
@@ -55,7 +55,7 @@ function StaffForm({ id, form, onChange, onSubmit }) {
           required
         />
       </label>
-      <fieldset className="admin-field admin-field--full admin-staff__roles">
+      <fieldset className="ui-field ui-field--full admin-staff__roles">
         <legend>Access level</legend>
         {staffRoleOptions.map((option) => (
           <label

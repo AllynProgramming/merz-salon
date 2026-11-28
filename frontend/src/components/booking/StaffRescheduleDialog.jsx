@@ -8,7 +8,7 @@ import {
   getStaffAvailability,
   rescheduleStaffAppointment,
 } from "../../services/bookingApi.js";
-import Modal from "../admin/ui/Modal.jsx";
+import Modal from "../ui/Modal.jsx";
 
 function dateKey(date) {
   const year = date.getFullYear();
@@ -228,7 +228,7 @@ function StaffRescheduleDialog({
         >
           {saving ? (
             <>
-              <span className="admin-spinner" aria-hidden="true" />
+              <span className="ui-spinner" aria-hidden="true" />
               Saving…
             </>
           ) : (

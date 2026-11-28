@@ -15,9 +15,9 @@ import {
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
-import Modal from "../components/admin/ui/Modal.jsx";
-import useConfirm from "../components/admin/ui/useConfirm.jsx";
-import { toast } from "../components/admin/ui/toast.js";
+import Modal from "../components/ui/Modal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import ServiceForm from "../components/admin/ServiceForm.jsx";
 import {
   emptyServiceForm,
@@ -437,7 +437,7 @@ function AdminServicesPage() {
           <div className="admin-services__toolbar">
             <div>
               <h2 id="admin-services-menu-heading">Service menu</h2>
-              <p className="admin-services__summary admin-tabular">
+              <p className="admin-services__summary ui-tabular">
                 {availableCount} available · {archivedCount} archived
               </p>
             </div>
@@ -474,7 +474,7 @@ function AdminServicesPage() {
                 onClick={() => setServiceFilter(filter.value)}
               >
                 {filter.label}
-                <span className="admin-services__filter-count admin-tabular">
+                <span className="admin-services__filter-count ui-tabular">
                   {counts[filter.value]}
                 </span>
               </button>
@@ -568,7 +568,7 @@ function AdminServicesPage() {
                           </span>
                         )}
                       </div>
-                      <p className="admin-services__meta admin-tabular">
+                      <p className="admin-services__meta ui-tabular">
                         <span>{service.category || "Uncategorized"}</span>
                         <span>{service.durationMinutes}&nbsp;min</span>
                         <span>{formatPrice(service.price)}</span>
@@ -589,7 +589,7 @@ function AdminServicesPage() {
                       >
                         {openingId === service._id ? (
                           <>
-                            <span className="admin-spinner" aria-hidden="true" />
+                            <span className="ui-spinner" aria-hidden="true" />
                             Opening…
                           </>
                         ) : (
@@ -653,19 +653,19 @@ function AdminServicesPage() {
           </Modal.Header>
           <Modal.Body>
             {waitingFor && (
-              <p className="admin-note admin-note--warning" role="status">
+              <p className="ui-note ui-note--warning" role="status">
                 {waitingFor.holderName || "Another admin"} opened this service
                 at {formatOpenedAt(waitingFor.openedAt)} and takes precedence.
                 You can keep making changes. Save unlocks when they finish.
               </p>
             )}
             {modalNotice && !waitingFor && (
-              <p className="admin-note" role="status">
+              <p className="ui-note" role="status">
                 {modalNotice}
               </p>
             )}
             {modalError && (
-              <p className="admin-note admin-note--error" role="alert">
+              <p className="ui-note ui-note--error" role="alert">
                 {modalError}
               </p>
             )}
@@ -697,7 +697,7 @@ function AdminServicesPage() {
             >
               {saving ? (
                 <>
-                  <span className="admin-spinner" aria-hidden="true" />
+                  <span className="ui-spinner" aria-hidden="true" />
                   Saving…
                 </>
               ) : waitingFor ? (

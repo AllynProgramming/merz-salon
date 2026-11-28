@@ -5,7 +5,7 @@ import useAuth from "../context/useAuth.js";
 import "../styles/customer.css";
 import "../styles/admin-dashboard.css";
 import AdminNavigation from "../components/admin/AdminNavigation.jsx";
-import Modal from "../components/admin/ui/Modal.jsx";
+import Modal from "../components/ui/Modal.jsx";
 import "../styles/admin-reports.css";
 
 const formatCurrency = (value) =>

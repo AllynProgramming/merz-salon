@@ -48,3 +48,7 @@ export function formatTime(value) {
     minute: "2-digit",
   }).format(new Date(2000, 0, 1, hours, minutes));
 }
+
+// A service is "most loved" once enough customers have rated it highly.
+export const isMostLoved = (service) =>
+  Number(service?.averageRating) >= 4.5 && Number(service?.ratingCount) >= 5;

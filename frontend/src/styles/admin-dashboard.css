@@ -2322,57 +2322,57 @@
   flex: 0 0 auto;
 }
 
-.admin-modal .admin-schedule__hours-form {
+.ui-modal .admin-schedule__hours-form {
   display: block;
 }
 
-.admin-modal .admin-schedule__hours-list {
+.ui-modal .admin-schedule__hours-list {
   width: 100%;
 }
 
-.admin-modal .admin-schedule__hours-row {
+.ui-modal .admin-schedule__hours-row {
   grid-template-columns: minmax(130px, 1fr) minmax(120px, 1fr) auto minmax(120px, 1fr);
   min-height: 56px;
   padding-block: 4px;
 }
 
-.admin-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
+.ui-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
   grid-column: 2 / -1;
   grid-row: auto;
 }
 
-.admin-modal .admin-schedule__hours-row.is-off .admin-schedule__hours-day span {
+.ui-modal .admin-schedule__hours-row.is-off .admin-schedule__hours-day span {
   color: #718175;
 }
 
-.admin-modal .admin-schedule__time-field input {
+.ui-modal .admin-schedule__time-field input {
   width: 100%;
   min-height: 40px;
   border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
 
-.admin-modal .admin-schedule__time-field input:focus-visible {
+.ui-modal .admin-schedule__time-field input:focus-visible {
   border-color: #205638;
   outline: none;
   box-shadow: 0 0 0 3px rgba(32, 86, 56, 0.16);
 }
 
 @media (max-width: 560px) {
-  .admin-modal .admin-schedule__hours-row {
+  .ui-modal .admin-schedule__hours-row {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     padding-block: 10px;
   }
 
-  .admin-modal .admin-schedule__hours-day {
+  .ui-modal .admin-schedule__hours-day {
     grid-column: 1 / -1;
   }
 
-  .admin-modal .admin-schedule__hours-row .admin-schedule__time-field:last-of-type {
+  .ui-modal .admin-schedule__hours-row .admin-schedule__time-field:last-of-type {
     grid-column: auto;
   }
 
-  .admin-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
+  .ui-modal .admin-schedule__hours-row.is-off .admin-schedule__day-off {
     grid-column: 1 / -1;
   }
 

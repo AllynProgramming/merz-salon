@@ -1,44 +1,42 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useLocation, useParams } from "react-router-dom";
 import Navbar from "../components/landing/Navbar.jsx";
 import StarRating from "../components/customer/StarRating.jsx";
 import {
   BookingSummary,
-  ConfirmDialog,
   StatusBadge,
-  Toast,
 } from "../components/booking/BookingComponents.jsx";
+import RescheduleModal from "../components/customer/RescheduleModal.jsx";
+import FeedbackModal from "../components/customer/FeedbackModal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import { formatDate, formatTime } from "../components/booking/bookingUtils.js";
 import useAuth from "../context/useAuth.js";
-import {
-  cancelAppointment,
-  getAppointment,
-  submitAppointmentFeedback,
-  updateAppointmentFeedback,
-} from "../services/bookingApi.js";
+import { cancelAppointment, getAppointment } from "../services/bookingApi.js";
 import "../styles/booking.css";
 
 function AppointmentPage() {
   const { id } = useParams();
   const location = useLocation();
   const { token } = useAuth();
-  const cancelTrigger = useRef(null);
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState(location.state?.notice || "");
-  const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [feedbackDraft, setFeedbackDraft] = useState({
-    rating: 0,
-    comment: "",
-  });
-  const [editingFeedback, setEditingFeedback] = useState(false);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackError, setFeedbackError] = useState("");
-  const [feedbackSaved, setFeedbackSaved] = useState("");
+  // Older links to /appointments/:id/reschedule land here with the
+  // reschedule modal already open.
+  const [rescheduleOpen, setRescheduleOpen] = useState(
+    Boolean(location.state?.openReschedule),
+  );
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
+
+  // A message handed over by the page that sent us here.
+  useEffect(() => {
+    if (location.state?.notice) toast.success(location.state.notice);
+  }, [location.state?.notice]);
 
   useEffect(() => {
     let active = true;
@@ -68,63 +66,24 @@ function AppointmentPage() {
   }, [id, token, retry]);
 
   const cancel = async () => {
+    if (cancelLoading) return;
+    const confirmed = await confirm({
+      title: "Cancel this appointment?",
+      description: `This can't be undone. You're cancelling ${serviceName} on ${formatDate(appointment.date)} at ${formatTime(appointment.startTime)}.`,
+      confirmLabel: "Cancel Appointment",
+      cancelLabel: "Keep Appointment",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setCancelLoading(true);
-    setError("");
     try {
       const result = await cancelAppointment(id, token);
       setAppointment(result.appointment || result);
-      setNotice("Your appointment has been cancelled.");
-      setConfirmCancel(false);
+      toast.success("Your appointment was cancelled.");
     } catch (requestError) {
-      setError(requestError.message || "We couldn't cancel this appointment.");
+      toast.error(requestError.message || "We couldn't cancel this appointment.");
     } finally {
       setCancelLoading(false);
-    }
-  };
-
-  const handleFeedbackSubmit = async (event) => {
-    event.preventDefault();
-    if (!feedbackDraft.rating) {
-      setFeedbackError("Please choose a rating.");
-      return;
-    }
-    setFeedbackLoading(true);
-    setFeedbackError("");
-    setFeedbackSaved("");
-
-    try {
-      const result = editingFeedback
-        ? await updateAppointmentFeedback({
-            feedbackId: appointment.feedback._id,
-            rating: feedbackDraft.rating,
-            comment: feedbackDraft.comment,
-            token,
-          })
-        : await submitAppointmentFeedback({
-            appointmentId: id,
-            rating: feedbackDraft.rating,
-            comment: feedbackDraft.comment,
-            token,
-          });
-      setAppointment((current) => ({
-        ...current,
-        feedback: result.feedback,
-        canReview: false,
-        canEditFeedback: true,
-      }));
-      setEditingFeedback(false);
-      setFeedbackSaved(
-        result.message ||
-          (appointment.feedback
-            ? "Your feedback was updated."
-            : "Thank you for your feedback."),
-      );
-    } catch (requestError) {
-      setFeedbackError(
-        requestError.message || "We couldn't save your feedback.",
-      );
-    } finally {
-      setFeedbackLoading(false);
     }
   };
 
@@ -154,7 +113,7 @@ function AppointmentPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="booking-container">
+      <main id="main-content" tabIndex={-1} className="booking-container">
         <header className="booking-header">
           <div>
             <p className="booking-eyebrow">Your appointment</p>
@@ -171,7 +130,6 @@ function AppointmentPage() {
             Dashboard
           </Link>
         </header>
-        {notice && <Toast message={notice} onDismiss={() => setNotice("")} />}
         {error && (
           <div className="booking-state booking-state-error" role="alert">
             <span>{error}</span>
@@ -189,7 +147,7 @@ function AppointmentPage() {
         )}
         {loading ? (
           <div className="booking-state" role="status" aria-busy="true">
-            Loading appointment...
+            Loading appointment…
           </div>
         ) : (
           appointment && (
@@ -222,12 +180,13 @@ function AppointmentPage() {
                 </p>
                 <div className="booking-appointment-actions">
                   {appointment.canReschedule ? (
-                    <Link
+                    <button
                       className="booking-button booking-button-primary"
-                      to={`/appointments/${id}/reschedule`}
+                      type="button"
+                      onClick={() => setRescheduleOpen(true)}
                     >
                       Reschedule
-                    </Link>
+                    </button>
                   ) : (
                     <div className="booking-disabled-action">
                       <button
@@ -247,10 +206,10 @@ function AppointmentPage() {
                     <button
                       className="booking-button booking-button-danger"
                       type="button"
-                      ref={cancelTrigger}
-                      onClick={() => setConfirmCancel(true)}
+                      onClick={cancel}
+                      aria-busy={cancelLoading || undefined}
                     >
-                      Cancel Appointment
+                      {cancelLoading ? "Cancelling…" : "Cancel Appointment"}
                     </button>
                   ) : (
                     <div className="booking-disabled-action">
@@ -318,116 +277,39 @@ function AppointmentPage() {
                   <div className="customer-panel-header">
                     <h2 id="feedback-title">Customer feedback</h2>
                   </div>
-                  {feedbackSaved && (
-                    <div
-                      className="customer-alert customer-alert-success"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {feedbackSaved}
-                    </div>
-                  )}
-                  {appointment.feedback && !editingFeedback ? (
+                  {appointment.feedback ? (
                     <div className="customer-feedback-box">
                       <StarRating value={appointment.feedback.rating} />
                       <p>
                         {appointment.feedback.comment ||
-                          "You left this appointment without a written note."}
+                          "You rated this visit without a written note."}
                       </p>
                       {appointment.canEditFeedback ? (
                         <button
                           className="customer-button customer-button-outline"
                           type="button"
-                          onClick={() => {
-                            setFeedbackDraft({
-                              rating: appointment.feedback.rating,
-                              comment: appointment.feedback.comment || "",
-                            });
-                            setEditingFeedback(true);
-                            setFeedbackError("");
-                            setFeedbackSaved("");
-                          }}
+                          onClick={() => setFeedbackOpen(true)}
                         >
-                          Edit feedback
+                          Edit Feedback
                         </button>
                       ) : (
                         <small>{appointment.canEditFeedbackReason}</small>
                       )}
                     </div>
                   ) : (
-                    <form
-                      className="customer-feedback-form"
-                      onSubmit={handleFeedbackSubmit}
-                    >
-                      <label>
-                        <span>Your rating</span>
-                        <StarRating
-                          value={feedbackDraft.rating}
-                          interactive
-                          onChange={(rating) =>
-                            setFeedbackDraft((current) => ({
-                              ...current,
-                              rating,
-                            }))
-                          }
-                          disabled={feedbackLoading}
-                        />
-                      </label>
-                      <label>
-                        <span>Comments</span>
-                        <textarea
-                          value={feedbackDraft.comment}
-                          rows={4}
-                          maxLength={1000}
-                          placeholder="Tell us about your salon experience"
-                          onChange={(event) =>
-                            setFeedbackDraft((current) => ({
-                              ...current,
-                              comment: event.target.value,
-                            }))
-                          }
-                          disabled={feedbackLoading}
-                        />
-                        <small aria-live="polite">
-                          {feedbackDraft.comment.length}/1000 characters
-                        </small>
-                      </label>
-                      {feedbackError && (
-                        <div
-                          className="customer-alert customer-alert-error"
-                          role="alert"
-                        >
-                          {feedbackError}
-                        </div>
-                      )}
+                    <div className="customer-feedback-box">
+                      <p>
+                        How was your visit? A quick rating helps other
+                        customers and helps the salon improve.
+                      </p>
                       <button
                         className="customer-button customer-button-primary"
-                        type="submit"
-                        disabled={feedbackLoading}
+                        type="button"
+                        onClick={() => setFeedbackOpen(true)}
                       >
-                        {feedbackLoading && (
-                          <span
-                            className="booking-spinner"
-                            aria-hidden="true"
-                          />
-                        )}
-                        {feedbackLoading
-                          ? "Saving feedback..."
-                          : editingFeedback
-                            ? "Save changes"
-                            : "Submit Feedback"}
+                        Leave Feedback
                       </button>
-                      {editingFeedback && (
-                        <button
-                          className="customer-button customer-button-outline"
-                          type="button"
-                          disabled={feedbackLoading}
-                          onClick={() => setEditingFeedback(false)}
-                        >
-                          Keep existing feedback
-                        </button>
-                      )}
-                    </form>
+                    </div>
                   )}
                 </section>
               )}
@@ -439,23 +321,42 @@ function AppointmentPage() {
           )
         )}
       </main>
-      {confirmCancel && appointment && (
-        <ConfirmDialog
-          title="Cancel this appointment?"
-          confirmLabel="Cancel Appointment"
-          busy={cancelLoading}
-          onConfirm={cancel}
-          onCancel={() => setConfirmCancel(false)}
-          triggerRef={cancelTrigger}
-        >
-          <p>
-            This cannot be undone. You are cancelling{" "}
-            <strong>{serviceName}</strong> on{" "}
-            <strong>{formatDate(appointment.date)}</strong> at{" "}
-            <strong>{formatTime(appointment.startTime)}</strong>.
-          </p>
-        </ConfirmDialog>
+      {rescheduleOpen && appointment?.canReschedule && (
+        <RescheduleModal
+          appointment={appointment}
+          token={token}
+          onClose={() => setRescheduleOpen(false)}
+          onRescheduled={(updated) => {
+            setRescheduleOpen(false);
+            setAppointment((current) => ({ ...current, ...updated }));
+            setRetry((value) => value + 1);
+            toast.success("Your appointment has been moved to the new time.");
+          }}
+        />
       )}
+      {feedbackOpen && appointment && (
+        <FeedbackModal
+          appointment={appointment}
+          feedback={appointment.feedback}
+          token={token}
+          onClose={() => setFeedbackOpen(false)}
+          onSaved={(feedback, kind) => {
+            setFeedbackOpen(false);
+            setAppointment((current) => ({
+              ...current,
+              feedback,
+              canReview: false,
+              canEditFeedback: true,
+            }));
+            toast.success(
+              kind === "updated"
+                ? "Your feedback was updated."
+                : "Thank you! Your feedback was sent.",
+            );
+          }}
+        />
+      )}
+      {confirmDialog}
     </div>
   );
 }

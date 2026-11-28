@@ -1,48 +1,95 @@
-import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import StarRating from "../customer/StarRating.jsx";
 import {
   formatDate,
   formatDuration,
   formatPrice,
   formatTime,
+  isMostLoved,
 } from "./bookingUtils.js";
 
-export function ServiceCard({ service, compact = false }) {
-  const duration = formatDuration(service.durationMinutes);
-  const rating = Number(service?.averageRating ?? 0);
-  const ratingCount = Number(service?.ratingCount ?? 0);
-  const starValue = Number.isFinite(rating) ? rating : 0;
+const ratingFormat = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
+export function ServiceDuration({ minutes }) {
   return (
-    <article className={`booking-service-card ${compact ? "is-compact" : ""}`}>
-      <div className="booking-service-topline">
-        {service.category && (
-          <span className="booking-category-label">{service.category}</span>
-        )}
-        <span className="booking-duration">{duration}</span>
-      </div>
-      <h3>{service.name}</h3>
-      <p className="booking-service-description">{service.description}</p>
-      <div className="booking-service-meta">
-        <span className="booking-service-rating">
-          {starValue > 0 && <StarRating value={starValue} />}
-          {starValue > 0 && <small>{starValue.toFixed(1)}</small>}
-        </span>
+    <span className="booking-service-duration">
+      <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+        <circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M10 6v4.2l2.6 1.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+      {formatDuration(minutes)}
+    </span>
+  );
+}
+
+export function ServiceRating({ service }) {
+  const rating = Number(service?.averageRating ?? 0);
+  const count = Number(service?.ratingCount ?? 0);
+  if (!(rating > 0 && count > 0)) {
+    return <span className="booking-service-rating is-empty">New</span>;
+  }
+  return (
+    <span className="booking-service-rating">
+      <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+        <path
+          d="M10 2.2l2.3 4.9 5.3.6-3.9 3.6 1 5.3L10 14l-4.7 2.6 1-5.3-3.9-3.6 5.3-.6z"
+          fill="currentColor"
+        />
+      </svg>
+      <span>
+        <strong>{ratingFormat.format(rating)}</strong>{" "}
         <small>
-          {starValue > 0
-            ? `${ratingCount} review${ratingCount === 1 ? "" : "s"}`
-            : "No ratings yet"}
+          ({count} review{count === 1 ? "" : "s"})
         </small>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * One service on the menu. The name opens the details pop-up; "Book" goes
+ * straight to booking with the service already chosen.
+ */
+export function ServiceCard({ service, onShowDetails }) {
+  return (
+    <article className="booking-service-card">
+      <div className="booking-service-topline">
+        <span className="booking-category-label">
+          {service.category || "Service"}
+        </span>
+        {isMostLoved(service) && (
+          <span className="booking-service-badge">Most loved</span>
+        )}
+      </div>
+      <h3>
+        <button
+          type="button"
+          className="booking-service-name"
+          onClick={() => onShowDetails?.(service)}
+          aria-haspopup="dialog"
+        >
+          {service.name}
+        </button>
+      </h3>
+      {service.description && (
+        <p className="booking-service-description">{service.description}</p>
+      )}
+      <div className="booking-service-facts">
+        <ServiceDuration minutes={service.durationMinutes} />
+        <ServiceRating service={service} />
       </div>
       <div className="booking-service-footer">
-        <strong>{formatPrice(service.price)}</strong>
+        <strong className="booking-service-price">
+          {formatPrice(service.price)}
+        </strong>
         <Link
-          className="booking-link-button"
+          className="booking-service-book"
           to={`/book-appointment?service=${encodeURIComponent(service._id)}`}
           aria-label={`Book ${service.name}`}
         >
-          Book Now
+          Book
         </Link>
       </div>
     </article>
@@ -51,6 +98,7 @@ export function ServiceCard({ service, compact = false }) {
 
 export function ServiceFilters({
   categories,
+  counts,
   category,
   onCategory,
   search,
@@ -59,25 +107,35 @@ export function ServiceFilters({
   onSort,
 }) {
   return (
-    <div className="booking-filters">
+    <div className={`booking-filters${onSort ? "" : " booking-filters--no-sort"}`}>
       <label className="booking-search-field">
-        <span>Search services</span>
+        <span className="booking-visually-hidden">Search services</span>
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+          <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.8" fill="none" />
+          <path d="M13.2 13.2L17 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
         <input
           type="search"
           value={search}
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Try haircut or color"
+          name="service-search"
+          placeholder="Search haircut, color, nails…"
+          autoComplete="off"
+          spellCheck={false}
         />
       </label>
-      <label className="booking-sort-field">
-        <span>Sort by</span>
-        <select value={sort} onChange={(event) => onSort(event.target.value)}>
-          <option value="name">Service name</option>
-          <option value="price-asc">Price: low to high</option>
-          <option value="price-desc">Price: high to low</option>
-          <option value="duration">Shortest duration</option>
-        </select>
-      </label>
+      {onSort && (
+        <label className="booking-sort-field">
+          <span>Sort</span>
+          <select value={sort} onChange={(event) => onSort(event.target.value)}>
+            <option value="name">Name</option>
+            <option value="popular">Most popular</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="duration">Shortest first</option>
+          </select>
+        </label>
+      )}
       <div
         className="booking-category-filters"
         role="group"
@@ -92,6 +150,7 @@ export function ServiceFilters({
             key={item}
           >
             {item}
+            {counts && <span className="booking-filter-count">{counts[item] ?? 0}</span>}
           </button>
         ))}
       </div>
@@ -292,117 +351,6 @@ export function StatusBadge({ status }) {
       </span>
       <span>{normalizedStatus}</span>
     </span>
-  );
-}
-
-export function ConfirmDialog({
-  title,
-  children,
-  confirmLabel = "Confirm",
-  busy = false,
-  onConfirm,
-  onCancel,
-  triggerRef,
-}) {
-  return (
-    <DialogFrame title={title} onCancel={onCancel} triggerRef={triggerRef}>
-      <div className="booking-dialog-copy">{children}</div>
-      <div className="booking-dialog-actions">
-        <button
-          className="booking-button booking-button-outline"
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-        >
-          Keep appointment
-        </button>
-        <button
-          className="booking-button booking-button-danger"
-          type="button"
-          onClick={onConfirm}
-          disabled={busy}
-        >
-          {busy && <span className="booking-spinner" aria-hidden="true" />}
-          {busy ? "Working..." : confirmLabel}
-        </button>
-      </div>
-    </DialogFrame>
-  );
-}
-
-export function DialogFrame({ title, children, onCancel, triggerRef }) {
-  const dialogRef = useRef(null);
-  const previousFocus = useRef(null);
-
-  useEffect(() => {
-    const trigger = triggerRef?.current;
-    previousFocus.current = document.activeElement;
-    dialogRef.current?.querySelector("button")?.focus();
-    return () => {
-      (trigger || previousFocus.current)?.focus?.();
-    };
-  }, [triggerRef]);
-
-  const trapFocus = (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCancel();
-      return;
-    }
-    if (event.key !== "Tab") return;
-    const focusable = [
-      ...dialogRef.current.querySelectorAll(
-        "button:not(:disabled), a[href], input:not(:disabled)",
-      ),
-    ];
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus();
-    }
-  };
-
-  return (
-    <div
-      className="booking-dialog-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <section
-        className="booking-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="booking-dialog-title"
-        ref={dialogRef}
-        onKeyDown={trapFocus}
-      >
-        <h2 id="booking-dialog-title">{title}</h2>
-        {children}
-      </section>
-    </div>
-  );
-}
-
-export function Toast({ message, variant = "success", onDismiss }) {
-  if (!message) return null;
-  return (
-    <div
-      className={`booking-toast booking-toast-${variant}`}
-      role={variant === "error" ? "alert" : "status"}
-      aria-live={variant === "error" ? "assertive" : "polite"}
-    >
-      <span>{message}</span>
-      {onDismiss && (
-        <button type="button" aria-label="Dismiss message" onClick={onDismiss}>
-          ×
-        </button>
-      )}
-    </div>
   );
 }
 

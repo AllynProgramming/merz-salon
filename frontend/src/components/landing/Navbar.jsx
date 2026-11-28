@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import LandingIcon from "./LandingIcon.jsx";
 import UserMenu from "../auth/UserMenu.jsx";
 import useAuth from "../../context/useAuth.js";
+import Toaster from "../ui/Toaster.jsx";
 
 function Navbar() {
   const location = useLocation();
@@ -14,6 +15,9 @@ function Navbar() {
 
   return (
     <header className="salon-nav">
+      <a className="ui-skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <div className="salon-container salon-nav-inner">
         <Link
           className="salon-brand"
@@ -22,7 +26,7 @@ function Navbar() {
           onClick={closeMenu}
         >
           <span className="salon-brand-mark" aria-hidden="true">
-            <img src="/logo-mark.png" alt="" />
+            <img src="/logo-mark.png" alt="" width="40" height="40" />
           </span>
           <span>MERZ Beauty Salon</span>
         </Link>
@@ -90,6 +94,7 @@ function Navbar() {
           </div>
         </nav>
       </div>
+      <Toaster />
     </header>
   );
 }

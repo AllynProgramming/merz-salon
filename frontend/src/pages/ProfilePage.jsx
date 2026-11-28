@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useBlocker } from "react-router-dom";
 import Navbar from "../components/landing/Navbar.jsx";
+import Modal from "../components/ui/Modal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import {
   CustomerField,
   CustomerPasswordField,
@@ -94,33 +96,31 @@ function initialsFor(name) {
     .toUpperCase();
 }
 
+const emptyPasswords = {
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+};
+
 function ProfilePage() {
   const { user, updateProfile, changePassword } = useAuth();
-  const [editing, setEditing] = useState(false);
+  // Which modal is open: "", "profile" or "password".
+  const [openModal, setOpenModal] = useState("");
   const [draft, setDraft] = useState(() => toDraft(user));
   const [profileErrors, setProfileErrors] = useState({});
   const [profileTouched, setProfileTouched] = useState({});
-  const [passwordValues, setPasswordValues] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  const [passwordValues, setPasswordValues] = useState(emptyPasswords);
   const [passwordErrors, setPasswordErrors] = useState({});
   const [passwordTouched, setPasswordTouched] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [serverError, setServerError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [passwordNotice, setPasswordNotice] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
 
-  const changed = JSON.stringify(draft) !== JSON.stringify(toDraft(user));
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      editing && changed && currentLocation.pathname !== nextLocation.pathname,
-  );
-  const { state: navigationState, proceed, reset } = blocker;
+  const profileChanged = JSON.stringify(draft) !== JSON.stringify(toDraft(user));
+  const passwordTyped = Object.values(passwordValues).some(Boolean);
   const fullName =
     user?.name ||
     [user?.firstname, user?.lastname].filter(Boolean).join(" ") ||
@@ -132,7 +132,6 @@ function ProfilePage() {
       [event.target.name]: event.target.value,
     }));
     setServerError("");
-    setNotice("");
   };
 
   const updatePassword = (event) => {
@@ -141,7 +140,6 @@ function ProfilePage() {
       [event.target.name]: event.target.value,
     }));
     setPasswordError("");
-    setPasswordNotice("");
   };
 
   const touchProfile = (field) => {
@@ -160,23 +158,43 @@ function ProfilePage() {
     }));
   };
 
-  useEffect(() => {
-    if (navigationState !== "blocked") return;
-    if (window.confirm("Discard your unsaved profile changes?")) {
-      proceed();
-    } else {
-      reset();
-    }
-  }, [navigationState, proceed, reset]);
-
-  const cancelEdit = () => {
-    if (changed && !window.confirm("Discard your unsaved profile changes?"))
-      return;
+  const openProfile = () => {
     setDraft(toDraft(user));
     setProfileErrors({});
     setProfileTouched({});
     setServerError("");
-    setEditing(false);
+    setOpenModal("profile");
+  };
+
+  const openPassword = () => {
+    setPasswordValues(emptyPasswords);
+    setPasswordErrors({});
+    setPasswordTouched({});
+    setPasswordError("");
+    setOpenModal("password");
+  };
+
+  // Escape, the X, a backdrop click and Cancel all land here.
+  const closeModal = async () => {
+    if (savingProfile || savingPassword) return;
+    const unsaved =
+      openModal === "profile" ? profileChanged : passwordTyped;
+    if (
+      unsaved &&
+      !(await confirm({
+        title: "Discard your changes?",
+        description:
+          openModal === "profile"
+            ? "Your profile changes haven't been saved."
+            : "The password you typed hasn't been saved.",
+        confirmLabel: "Discard Changes",
+        cancelLabel: "Keep Editing",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setOpenModal("");
   };
 
   const saveProfile = async (event) => {
@@ -204,9 +222,9 @@ function ProfilePage() {
         phone: draft.phone.trim(),
         address: draft.address.trim(),
       });
-      setNotice("Your profile has been saved.");
-      setEditing(false);
-      setProfileTouched({});
+      setImageFailed(false);
+      setOpenModal("");
+      toast.success("Your profile has been saved.");
     } catch (error) {
       setServerError(error.message || "We couldn't save your profile.");
       if (error.errors) setProfileErrors(error.errors);
@@ -236,14 +254,9 @@ function ProfilePage() {
     setPasswordError("");
     try {
       const result = await changePassword(passwordValues);
-      setPasswordValues({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-      setPasswordTouched({});
-      setPasswordErrors({});
-      setPasswordNotice(result.message || "Your password has been changed.");
+      setPasswordValues(emptyPasswords);
+      setOpenModal("");
+      toast.success(result.message || "Your password has been changed.");
     } catch (error) {
       setPasswordError(error.message || "We couldn't change your password.");
       if (error.errors) setPasswordErrors(error.errors);
@@ -262,7 +275,11 @@ function ProfilePage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="customer-container customer-profile-page">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="customer-container customer-profile-page"
+      >
         <header className="customer-page-heading">
           <div>
             <p className="customer-eyebrow">Your account</p>
@@ -271,96 +288,105 @@ function ProfilePage() {
               Keep your contact details current for a smoother visit.
             </p>
           </div>
-          {!editing && (
-            <button
-              className="customer-button customer-button-primary"
-              type="button"
-              onClick={() => {
-                setDraft(toDraft(user));
-                setEditing(true);
-              }}
-            >
-              Edit Profile
-            </button>
-          )}
+          <button
+            className="customer-button customer-button-primary"
+            type="button"
+            onClick={openProfile}
+          >
+            Edit Profile
+          </button>
         </header>
 
-        {serverError && (
-          <div
-            className="customer-alert customer-alert-error"
-            role="alert"
-            aria-live="assertive"
-          >
-            {serverError}
+        <section
+          className="customer-profile-card"
+          aria-labelledby="profile-card-title"
+        >
+          <div className="customer-profile-summary">
+            {user?.avatarUrl && !imageFailed ? (
+              <img
+                className="customer-profile-avatar"
+                src={user.avatarUrl}
+                alt={`${fullName} profile`}
+                width="88"
+                height="88"
+                onError={() => setImageFailed(true)}
+              />
+            ) : (
+              <div
+                className="customer-profile-avatar customer-profile-initials"
+                role="img"
+                aria-label={`${fullName} initials`}
+              >
+                {initialsFor(fullName)}
+              </div>
+            )}
+            <div>
+              <p className="customer-eyebrow">Customer profile</p>
+              <h2 id="profile-card-title">{fullName}</h2>
+              <p>Member since {memberSince(user?.createdAt)}</p>
+            </div>
           </div>
-        )}
-        {notice && (
-          <div
-            className="customer-alert customer-alert-success"
-            role="status"
-            aria-live="polite"
-          >
-            {notice}
-          </div>
-        )}
+          <dl className="customer-profile-details">
+            <div>
+              <dt>Email</dt>
+              <dd translate="no">{user?.email || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>{user?.phone || user?.phoneNumber || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt>Address</dt>
+              <dd>{user?.address || "Not provided"}</dd>
+            </div>
+            <div>
+              <dt>Date of birth</dt>
+              <dd>{formatBirthday(user?.dateOfBirth)}</dd>
+            </div>
+          </dl>
+        </section>
 
-        {!editing ? (
-          <section
-            className="customer-profile-card"
-            aria-labelledby="profile-card-title"
+        <section
+          className="customer-panel customer-security-card"
+          aria-labelledby="password-title"
+        >
+          <div>
+            <p className="customer-eyebrow">Account security</p>
+            <h2 id="password-title">Password</h2>
+            <p className="customer-muted-copy">
+              Use a strong password you don’t use anywhere else.
+            </p>
+          </div>
+          <button
+            className="customer-button customer-button-outline"
+            type="button"
+            onClick={openPassword}
           >
-            <div className="customer-profile-summary">
-              {user?.avatarUrl && !imageFailed ? (
-                <img
-                  className="customer-profile-avatar"
-                  src={user.avatarUrl}
-                  alt={`${fullName} profile`}
-                  onError={() => setImageFailed(true)}
-                />
-              ) : (
-                <div
-                  className="customer-profile-avatar customer-profile-initials"
-                  role="img"
-                  aria-label={`${fullName} initials`}
-                >
-                  {initialsFor(fullName)}
-                </div>
-              )}
-              <div>
-                <p className="customer-eyebrow">Customer profile</p>
-                <h2 id="profile-card-title">{fullName}</h2>
-                <p>Member since {memberSince(user?.createdAt)}</p>
-              </div>
+            Change Password
+          </button>
+        </section>
+      </main>
+
+      {openModal === "profile" && (
+        <Modal onClose={closeModal} size="wide">
+          <Modal.Header>
+            <div>
+              <Modal.Eyebrow>Your account</Modal.Eyebrow>
+              <Modal.Title>Edit profile</Modal.Title>
+              <Modal.Description>
+                Fields marked * are required.
+              </Modal.Description>
             </div>
-            <dl className="customer-profile-details">
-              <div>
-                <dt>Email</dt>
-                <dd>{user?.email || "Not provided"}</dd>
-              </div>
-              <div>
-                <dt>Phone</dt>
-                <dd>{user?.phone || user?.phoneNumber || "Not provided"}</dd>
-              </div>
-              <div>
-                <dt>Address</dt>
-                <dd>{user?.address || "Not provided"}</dd>
-              </div>
-              <div>
-                <dt>Date of birth</dt>
-                <dd>{formatBirthday(user?.dateOfBirth)}</dd>
-              </div>
-            </dl>
-          </section>
-        ) : (
-          <section
-            className="customer-panel"
-            aria-labelledby="edit-profile-title"
-          >
-            <div className="customer-section-title-row">
-              <h2 id="edit-profile-title">Edit Profile</h2>
-              <span className="customer-required-note">* Required</span>
-            </div>
+            <Modal.Close label="Close without saving" />
+          </Modal.Header>
+          <Modal.Body>
+            {serverError && (
+              <p className="ui-note ui-note--error" role="alert">
+                {serverError}
+              </p>
+            )}
             <form
+              id="customer-profile-form"
               className="customer-form-grid"
               onSubmit={saveProfile}
               noValidate
@@ -381,6 +407,7 @@ function ProfilePage() {
                     value={draft.name}
                     onChange={updateDraft}
                     onBlur={() => touchProfile("name")}
+                    data-autofocus
                     required
                   />
                 )}
@@ -388,7 +415,7 @@ function ProfilePage() {
               <CustomerField
                 id="customer-email"
                 label="Email address"
-                helper="Email changes are not available right now."
+                helper="Email changes aren’t available right now."
               >
                 {(props) => (
                   <input
@@ -398,6 +425,7 @@ function ProfilePage() {
                     value={user?.email || ""}
                     readOnly
                     autoComplete="email"
+                    spellCheck={false}
                   />
                 )}
               </CustomerField>
@@ -415,6 +443,7 @@ function ProfilePage() {
                     name="phone"
                     inputMode="tel"
                     autoComplete="tel"
+                    placeholder="e.g. 0917 123 4567…"
                     value={draft.phone}
                     onChange={updateDraft}
                     onBlur={() => touchProfile("phone")}
@@ -481,6 +510,8 @@ function ProfilePage() {
                     type="url"
                     name="avatarUrl"
                     autoComplete="url"
+                    placeholder="https://…"
+                    spellCheck={false}
                     value={draft.avatarUrl}
                     onChange={updateDraft}
                     onBlur={() =>
@@ -492,119 +523,130 @@ function ProfilePage() {
                   />
                 )}
               </CustomerField>
-              <div className="customer-form-actions">
-                <button
-                  className="customer-button customer-button-primary"
-                  type="submit"
-                  disabled={savingProfile}
-                >
-                  {savingProfile && (
-                    <span className="customer-spinner" aria-hidden="true" />
-                  )}{" "}
-                  {savingProfile ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  className="customer-button customer-button-outline"
-                  type="button"
-                  onClick={cancelEdit}
-                  disabled={savingProfile}
-                >
-                  Cancel
-                </button>
-              </div>
             </form>
-          </section>
-        )}
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={closeModal}
+              disabled={savingProfile}
+            >
+              Cancel
+            </button>
+            <button
+              className="customer-button customer-button-primary"
+              type="submit"
+              form="customer-profile-form"
+              disabled={savingProfile}
+            >
+              {savingProfile ? (
+                <>
+                  <span className="ui-spinner" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
 
-        <section
-          className="customer-panel customer-password-panel"
-          aria-labelledby="password-title"
-        >
-          <div>
-            <p className="customer-eyebrow">Account security</p>
-            <h2 id="password-title">Change Password</h2>
-            <p className="customer-muted-copy">
-              Choose a strong password you do not use elsewhere.
-            </p>
-          </div>
-          {passwordError && (
-            <div
-              className="customer-alert customer-alert-error"
-              role="alert"
-              aria-live="assertive"
-            >
-              {passwordError}
-            </div>
-          )}
-          {passwordNotice && (
-            <div
-              className="customer-alert customer-alert-success"
-              role="status"
-              aria-live="polite"
-            >
-              {passwordNotice}
-            </div>
-          )}
-          <form
-            className="customer-password-form"
-            onSubmit={submitPassword}
-            noValidate
-          >
-            <CustomerPasswordField
-              id="customer-currentPassword"
-              label="Current password"
-              value={passwordValues.currentPassword}
-              onChange={updatePassword}
-              onBlur={() => touchPassword("currentPassword")}
-              autoComplete="current-password"
-              error={
-                passwordTouched.currentPassword
-                  ? passwordErrors.currentPassword
-                  : ""
-              }
-            />
+      {openModal === "password" && (
+        <Modal onClose={closeModal}>
+          <Modal.Header>
             <div>
+              <Modal.Eyebrow>Account security</Modal.Eyebrow>
+              <Modal.Title>Change password</Modal.Title>
+              <Modal.Description>
+                Use at least 8 characters with a letter and a number.
+              </Modal.Description>
+            </div>
+            <Modal.Close label="Close without changing" />
+          </Modal.Header>
+          <Modal.Body>
+            {passwordError && (
+              <p className="ui-note ui-note--error" role="alert">
+                {passwordError}
+              </p>
+            )}
+            <form
+              id="customer-password-form"
+              className="customer-password-form customer-password-form--stacked"
+              onSubmit={submitPassword}
+              noValidate
+            >
               <CustomerPasswordField
-                id="customer-newPassword"
-                label="New password"
-                value={passwordValues.newPassword}
+                id="customer-currentPassword"
+                label="Current password"
+                value={passwordValues.currentPassword}
                 onChange={updatePassword}
-                onBlur={() => touchPassword("newPassword")}
-                autoComplete="new-password"
+                onBlur={() => touchPassword("currentPassword")}
+                autoComplete="current-password"
                 error={
-                  passwordTouched.newPassword ? passwordErrors.newPassword : ""
+                  passwordTouched.currentPassword
+                    ? passwordErrors.currentPassword
+                    : ""
                 }
               />
-              <PasswordStrength value={passwordValues.newPassword} />
-            </div>
-            <CustomerPasswordField
-              id="customer-confirmPassword"
-              label="Confirm new password"
-              value={passwordValues.confirmPassword}
-              onChange={updatePassword}
-              onBlur={() => touchPassword("confirmPassword")}
-              autoComplete="new-password"
-              error={
-                passwordTouched.confirmPassword
-                  ? passwordErrors.confirmPassword
-                  : ""
-              }
-            />
-            <div className="customer-form-actions">
-              <button
-                className="customer-button customer-button-primary"
-                type="submit"
-                disabled={savingPassword}
-              >
-                {savingPassword && (
-                  <span className="customer-spinner" aria-hidden="true" />
-                )}{" "}
-                {savingPassword ? "Updating..." : "Update Password"}
-              </button>
-            </div>
-          </form>
-        </section>
-      </main>
+              <div>
+                <CustomerPasswordField
+                  id="customer-newPassword"
+                  label="New password"
+                  value={passwordValues.newPassword}
+                  onChange={updatePassword}
+                  onBlur={() => touchPassword("newPassword")}
+                  autoComplete="new-password"
+                  error={
+                    passwordTouched.newPassword ? passwordErrors.newPassword : ""
+                  }
+                />
+                <PasswordStrength value={passwordValues.newPassword} />
+              </div>
+              <CustomerPasswordField
+                id="customer-confirmPassword"
+                label="Confirm new password"
+                value={passwordValues.confirmPassword}
+                onChange={updatePassword}
+                onBlur={() => touchPassword("confirmPassword")}
+                autoComplete="new-password"
+                error={
+                  passwordTouched.confirmPassword
+                    ? passwordErrors.confirmPassword
+                    : ""
+                }
+              />
+            </form>
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              className="customer-button customer-button-outline"
+              type="button"
+              onClick={closeModal}
+              disabled={savingPassword}
+            >
+              Cancel
+            </button>
+            <button
+              className="customer-button customer-button-primary"
+              type="submit"
+              form="customer-password-form"
+              disabled={savingPassword}
+            >
+              {savingPassword ? (
+                <>
+                  <span className="ui-spinner" aria-hidden="true" />
+                  Updating…
+                </>
+              ) : (
+                "Update Password"
+              )}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+      {confirmDialog}
     </div>
   );
 }

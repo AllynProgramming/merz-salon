@@ -3,13 +3,13 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import Navbar from "../components/landing/Navbar.jsx";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
-import { bookingSchedule } from "../config/bookingSchedule.js";
+import RescheduleModal from "../components/customer/RescheduleModal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import useAuth from "../context/useAuth.js";
 import {
   cancelAppointment,
-  getAvailability,
   getDashboardOverview,
-  rescheduleAppointment,
 } from "../services/bookingApi.js";
 import "../styles/customer.css";
 
@@ -184,17 +184,10 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [reschedulingId, setReschedulingId] = useState("");
-  const [rescheduleDate, setRescheduleDate] = useState("");
-  const [rescheduleTime, setRescheduleTime] = useState("");
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [rescheduleSaving, setRescheduleSaving] = useState(false);
-  const [rescheduleError, setRescheduleError] = useState("");
-  const [rescheduleNotice, setRescheduleNotice] = useState("");
-  const [cancelPromptId, setCancelPromptId] = useState("");
-  const [cancelSaving, setCancelSaving] = useState(false);
-  const [cancelError, setCancelError] = useState("");
+  // The appointment open in the reschedule modal, or null.
+  const [rescheduling, setRescheduling] = useState(null);
+  const [cancellingId, setCancellingId] = useState("");
+  const [confirm, confirmDialog] = useConfirm();
   const firstName =
     user?.name?.trim().split(/\s+/)[0] || user?.firstname || "there";
 
@@ -236,131 +229,52 @@ function DashboardPage() {
     })),
   ];
 
-  const openReschedule = (appointment) => {
-    setReschedulingId(String(appointment._id));
-    setRescheduleDate(String(appointment.date).slice(0, 10));
-    setRescheduleTime("");
-    setAvailableSlots([]);
-    setSlotsLoading(true);
-    setRescheduleError(
-      appointment.service?._id || appointment.service
-        ? ""
-        : "This appointment has no service assigned.",
-    );
-    setRescheduleNotice("");
+  const finishReschedule = (updated) => {
+    const id = String(rescheduling._id);
+    setData((current) => {
+      if (!current) return current;
+      const updateAppointment = (appointment) =>
+        String(appointment._id) === id
+          ? { ...appointment, ...updated, service: appointment.service }
+          : appointment;
+      return {
+        ...current,
+        upcomingAppointments: current.upcomingAppointments.map(updateAppointment),
+        nextAppointment: current.nextAppointment
+          ? updateAppointment(current.nextAppointment)
+          : current.nextAppointment,
+      };
+    });
+    setRescheduling(null);
+    toast.success("Your appointment has been moved to the new time.");
   };
 
-  const closeReschedule = () => {
-    setReschedulingId("");
-    setAvailableSlots([]);
-    setRescheduleError("");
-  };
+  const cancelVisit = async (appointment) => {
+    if (cancellingId) return;
+    const confirmed = await confirm({
+      title: "Cancel this appointment?",
+      description: `This releases your ${formatDate(appointment.date)} at ${formatTime(appointment.startTime)} slot. You can book a new visit anytime.`,
+      confirmLabel: "Cancel Appointment",
+      cancelLabel: "Keep Appointment",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
-  const openCancelPrompt = (appointment) => {
-    setCancelPromptId(String(appointment._id));
-    setCancelError("");
-    closeReschedule();
-  };
-
-  const closeCancelPrompt = () => {
-    setCancelPromptId("");
-    setCancelError("");
-  };
-
-  useEffect(() => {
-    if (!reschedulingId || !rescheduleDate) return undefined;
-    const appointment = appointments.find(
-      (item) => String(item._id) === reschedulingId,
-    );
-    const serviceId = appointment?.service?._id || appointment?.service;
-    if (!serviceId) return undefined;
-
-    let active = true;
-    getAvailability({
-      serviceId,
-      date: rescheduleDate,
-      excludeAppointmentId: reschedulingId,
-      token,
-    })
-      .then((result) => {
-        if (!active) return;
-        setAvailableSlots(
-          (result.slots || []).filter((slot) => slot.available),
-        );
-        setRescheduleTime("");
-      })
-      .catch((requestError) => {
-        if (active) {
-          setAvailableSlots([]);
-          setRescheduleError(
-            requestError.message || "We couldn't load available times.",
-          );
-        }
-      })
-      .finally(() => {
-        if (active) setSlotsLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [appointments, rescheduleDate, reschedulingId, token]);
-
-  const confirmReschedule = async () => {
-    if (!reschedulingId || !rescheduleDate || !rescheduleTime) return;
-    setRescheduleSaving(true);
-    setRescheduleError("");
+    const id = String(appointment._id);
+    setCancellingId(id);
     try {
-      const result = await rescheduleAppointment(reschedulingId, {
-        date: rescheduleDate,
-        startTime: rescheduleTime,
-        token,
-      });
-      const updated = result.appointment || result;
+      await cancelAppointment(id, token);
       setData((current) => {
         if (!current) return current;
-        const updateAppointment = (appointment) =>
-          String(appointment._id) === reschedulingId
-            ? { ...appointment, ...updated }
-            : appointment;
-        return {
-          ...current,
-          upcomingAppointments:
-            current.upcomingAppointments.map(updateAppointment),
-          nextAppointment: current.nextAppointment
-            ? updateAppointment(current.nextAppointment)
-            : current.nextAppointment,
-        };
-      });
-      setRescheduleNotice("Your appointment has been rescheduled.");
-      setRescheduleTime("");
-      setAvailableSlots([]);
-    } catch (requestError) {
-      setRescheduleError(
-        requestError.message || "We couldn't reschedule this appointment.",
-      );
-    } finally {
-      setRescheduleSaving(false);
-    }
-  };
-
-  const confirmCancel = async () => {
-    if (!cancelPromptId) return;
-    setCancelSaving(true);
-    setCancelError("");
-    try {
-      await cancelAppointment(cancelPromptId, token);
-      setData((current) => {
-        if (!current) return current;
-        const remainingAppointments = current.upcomingAppointments.filter(
-          (appointment) => String(appointment._id) !== cancelPromptId,
+        const remaining = current.upcomingAppointments.filter(
+          (item) => String(item._id) !== id,
         );
         return {
           ...current,
-          upcomingAppointments: remainingAppointments,
+          upcomingAppointments: remaining,
           nextAppointment:
-            String(current.nextAppointment?._id) === cancelPromptId
-              ? remainingAppointments[0] || null
+            String(current.nextAppointment?._id) === id
+              ? remaining[0] || null
               : current.nextAppointment,
           counts: {
             ...current.counts,
@@ -369,13 +283,11 @@ function DashboardPage() {
           },
         };
       });
-      closeCancelPrompt();
+      toast.success("Your appointment was cancelled.");
     } catch (requestError) {
-      setCancelError(
-        requestError.message || "We couldn't cancel this appointment.",
-      );
+      toast.error(requestError.message || "We couldn't cancel this appointment.");
     } finally {
-      setCancelSaving(false);
+      setCancellingId("");
     }
   };
 
@@ -386,7 +298,7 @@ function DashboardPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="customer-container customer-dashboard">
+      <main id="main-content" tabIndex={-1} className="customer-container customer-dashboard">
         <header className="customer-page-heading">
           <div>
             <p className="customer-eyebrow">Your salon schedule</p>
@@ -431,7 +343,7 @@ function DashboardPage() {
                       <DashboardIcon name={stat.icon} />
                     </span>
                     <p>{stat.label}</p>
-                    <strong>{stat.count}</strong>
+                    <strong className="ui-tabular">{stat.count}</strong>
                   </article>
                 ))}
               </section>
@@ -464,196 +376,27 @@ function DashboardPage() {
                         >
                           View Details
                         </Link>
-                        <Link
+                        <button
                           className="customer-button customer-button-outline"
-                          to={`/appointments/${nextAppointment._id}/reschedule`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            openReschedule(nextAppointment);
-                          }}
+                          type="button"
+                          onClick={() => setRescheduling(nextAppointment)}
                         >
                           Reschedule
-                        </Link>
-                        <Link
+                        </button>
+                        <button
                           className="customer-button customer-button-outline"
-                          to={`/appointments/${nextAppointment._id}`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            openCancelPrompt(nextAppointment);
-                          }}
+                          type="button"
+                          onClick={() => cancelVisit(nextAppointment)}
+                          aria-busy={
+                            cancellingId === String(nextAppointment._id) ||
+                            undefined
+                          }
                         >
-                          Cancel
-                        </Link>
+                          {cancellingId === String(nextAppointment._id)
+                            ? "Cancelling…"
+                            : "Cancel"}
+                        </button>
                       </div>
-                      {cancelPromptId === String(nextAppointment._id) && (
-                        <div
-                          className="customer-cancel-panel"
-                          role="alertdialog"
-                          aria-labelledby="cancel-appointment-title"
-                          aria-describedby="cancel-appointment-description"
-                        >
-                          <div>
-                            <p className="customer-cancel-kicker">
-                              Before you go
-                            </p>
-                            <h3 id="cancel-appointment-title">
-                              Cancel this appointment?
-                            </h3>
-                            <p id="cancel-appointment-description">
-                              This will release your{" "}
-                              <strong>
-                                {formatDate(nextAppointment.date)} at{" "}
-                                {formatTime(nextAppointment.startTime)}
-                              </strong>{" "}
-                              slot. You can book a new visit anytime.
-                            </p>
-                          </div>
-                          {cancelError && (
-                            <p className="customer-cancel-error" role="alert">
-                              {cancelError}
-                            </p>
-                          )}
-                          <div className="customer-cancel-actions">
-                            <button
-                              className="customer-button customer-button-outline"
-                              type="button"
-                              onClick={closeCancelPrompt}
-                              disabled={cancelSaving}
-                            >
-                              Keep appointment
-                            </button>
-                            <button
-                              className="customer-button customer-button-danger"
-                              type="button"
-                              onClick={confirmCancel}
-                              disabled={cancelSaving}
-                            >
-                              {cancelSaving ? "Cancelling..." : "Yes, cancel"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {reschedulingId === String(nextAppointment._id) && (
-                        <div
-                          className="customer-reschedule-panel"
-                          role="region"
-                          aria-label="Reschedule appointment"
-                        >
-                          <div className="customer-reschedule-heading">
-                            <div>
-                              <p className="customer-reschedule-kicker">
-                                Change your visit
-                              </p>
-                              <h3>Find a better time</h3>
-                            </div>
-                            <p>
-                              Choose a date, then pick from the salon’s open
-                              times.
-                            </p>
-                          </div>
-                          <div className="customer-reschedule-fields">
-                            <label>
-                              <span>Date</span>
-                              <input
-                                type="date"
-                                value={rescheduleDate}
-                                min={new Date().toISOString().slice(0, 10)}
-                                max={(() => {
-                                  const maxDate = new Date();
-                                  maxDate.setDate(
-                                    maxDate.getDate() +
-                                      bookingSchedule.maximumDaysAhead,
-                                  );
-                                  return maxDate.toISOString().slice(0, 10);
-                                })()}
-                                onChange={(event) => {
-                                  setRescheduleDate(event.target.value);
-                                  setRescheduleTime("");
-                                  setSlotsLoading(true);
-                                  setRescheduleError("");
-                                }}
-                              />
-                            </label>
-                            <label>
-                              <span>Time</span>
-                              <select
-                                value={rescheduleTime}
-                                onChange={(event) =>
-                                  setRescheduleTime(event.target.value)
-                                }
-                                disabled={
-                                  slotsLoading || !availableSlots.length
-                                }
-                              >
-                                <option value="">
-                                  {slotsLoading
-                                    ? "Checking the schedule..."
-                                    : availableSlots.length
-                                      ? "Select an open time"
-                                      : "No open times"}
-                                </option>
-                                {availableSlots.map((slot) => (
-                                  <option
-                                    value={slot.startTime}
-                                    key={slot.startTime}
-                                  >
-                                    {formatTime(slot.startTime)} -{" "}
-                                    {formatTime(slot.endTime)}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                          {rescheduleTime && (
-                            <p className="customer-reschedule-selection">
-                              New visit:{" "}
-                              <strong>
-                                {formatDate(rescheduleDate)} at{" "}
-                                {formatTime(rescheduleTime)}
-                              </strong>
-                            </p>
-                          )}
-                          {rescheduleError && (
-                            <p
-                              className="customer-reschedule-error"
-                              role="alert"
-                            >
-                              {rescheduleError}
-                            </p>
-                          )}
-                          {rescheduleNotice && (
-                            <p
-                              className="customer-reschedule-notice"
-                              role="status"
-                            >
-                              {rescheduleNotice}
-                            </p>
-                          )}
-                          <div className="customer-reschedule-actions">
-                            <button
-                              className="customer-button customer-button-outline"
-                              type="button"
-                              onClick={closeReschedule}
-                            >
-                              Close
-                            </button>
-                            <button
-                              className="customer-button customer-button-primary"
-                              type="button"
-                              onClick={confirmReschedule}
-                              disabled={
-                                !rescheduleTime ||
-                                rescheduleSaving ||
-                                Boolean(rescheduleNotice)
-                              }
-                            >
-                              {rescheduleSaving
-                                ? "Saving..."
-                                : "Confirm Reschedule"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </section>
                   )}
 
@@ -723,6 +466,15 @@ function DashboardPage() {
           )
         )}
       </main>
+      {rescheduling && (
+        <RescheduleModal
+          appointment={rescheduling}
+          token={token}
+          onClose={() => setRescheduling(null)}
+          onRescheduled={finishReschedule}
+        />
+      )}
+      {confirmDialog}
     </div>
   );
 }

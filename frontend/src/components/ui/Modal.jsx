@@ -1,5 +1,5 @@
 import { createContext, use, useEffect, useId, useRef } from "react";
-import "./admin-ui.css";
+import "./ui.css";
 
 const ModalContext = createContext(null);
 
@@ -69,7 +69,7 @@ function Modal({ onClose, size = "default", role, className = "", children }) {
     <ModalContext value={{ onClose, titleId, descriptionId }}>
       <dialog
         ref={dialogRef}
-        className={`admin-modal admin-modal--${size} ${className}`.trim()}
+        className={`ui-modal ui-modal--${size} ${className}`.trim()}
         role={role}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
@@ -95,24 +95,24 @@ function Modal({ onClose, size = "default", role, className = "", children }) {
           pressStartedOnBackdrop.current = false;
         }}
       >
-        <div className="admin-modal__surface">{children}</div>
+        <div className="ui-modal__surface">{children}</div>
       </dialog>
     </ModalContext>
   );
 }
 
 function ModalHeader({ children }) {
-  return <header className="admin-modal__header">{children}</header>;
+  return <header className="ui-modal__header">{children}</header>;
 }
 
 function ModalEyebrow({ children }) {
-  return <p className="admin-modal__eyebrow">{children}</p>;
+  return <p className="ui-modal__eyebrow">{children}</p>;
 }
 
 function ModalTitle({ children }) {
   const { titleId } = useModal();
   return (
-    <h2 className="admin-modal__title" id={titleId}>
+    <h2 className="ui-modal__title" id={titleId}>
       {children}
     </h2>
   );
@@ -121,7 +121,7 @@ function ModalTitle({ children }) {
 function ModalDescription({ children }) {
   const { descriptionId } = useModal();
   return (
-    <p className="admin-modal__description" id={descriptionId}>
+    <p className="ui-modal__description" id={descriptionId}>
       {children}
     </p>
   );
@@ -131,7 +131,7 @@ function ModalClose({ label = "Close" }) {
   const { onClose } = useModal();
   return (
     <button
-      className="admin-modal__close"
+      className="ui-modal__close"
       type="button"
       aria-label={label}
       onClick={() => onClose?.()}
@@ -149,11 +149,11 @@ function ModalClose({ label = "Close" }) {
 }
 
 function ModalBody({ children }) {
-  return <div className="admin-modal__body">{children}</div>;
+  return <div className="ui-modal__body">{children}</div>;
 }
 
 function ModalFooter({ children }) {
-  return <footer className="admin-modal__footer">{children}</footer>;
+  return <footer className="ui-modal__footer">{children}</footer>;
 }
 
 Modal.Header = ModalHeader;

@@ -5,6 +5,10 @@ import Navbar from "../components/landing/Navbar.jsx";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import { formatPrice } from "../components/booking/bookingUtils.js";
 import StarRating from "../components/customer/StarRating.jsx";
+import RescheduleModal from "../components/customer/RescheduleModal.jsx";
+import FeedbackModal from "../components/customer/FeedbackModal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import useAuth from "../context/useAuth.js";
 import { cancelAppointment, getAppointments } from "../services/bookingApi.js";
 import "../styles/customer.css";
@@ -45,6 +49,9 @@ function AppointmentsPage() {
   const { token } = useAuth();
   const [type, setType] = useState("upcoming");
   const [status, setStatus] = useState("all");
+  // What the customer is typing, and the value we actually search for
+  // (updated after a short pause so each keystroke isn't a request).
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -56,6 +63,9 @@ function AppointmentsPage() {
   const [retry, setRetry] = useState(0);
   const [pendingCancelId, setPendingCancelId] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(null);
+  const [reviewing, setReviewing] = useState(null);
+  const [confirm, confirmDialog] = useConfirm();
   const items = data?.items || [];
   const counts = data?.counts || {};
 
@@ -94,6 +104,14 @@ function AppointmentsPage() {
     };
   }, [token, type, status, search, from, to, sort, page, retry]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
   const selectType = (nextType) => {
     setType(nextType);
     setPage(1);
@@ -117,19 +135,22 @@ function AppointmentsPage() {
   };
 
   const handleCancel = async (appointment) => {
-    if (
-      !window.confirm(
-        `Cancel your ${appointment.serviceName || "appointment"}?`,
-      )
-    )
-      return;
+    if (pendingCancelId) return;
+    const confirmed = await confirm({
+      title: `Cancel your ${appointment.serviceName || "appointment"}?`,
+      description: `This releases your ${formatDate(appointment.date)} at ${formatTime(appointment.startTime)} slot. You can book a new visit anytime.`,
+      confirmLabel: "Cancel Appointment",
+      cancelLabel: "Keep Appointment",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setPendingCancelId(appointment._id);
-    setError("");
     try {
       await cancelAppointment(appointment._id, token);
       setRetry((value) => value + 1);
+      toast.success("Your appointment was cancelled.");
     } catch (requestError) {
-      setError(requestError.message || "We couldn't cancel this appointment.");
+      toast.error(requestError.message || "We couldn't cancel this appointment.");
     } finally {
       setPendingCancelId("");
     }
@@ -157,7 +178,7 @@ function AppointmentsPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <Navbar />
-      <main className="customer-container">
+      <main id="main-content" tabIndex={-1} className="customer-container">
         <header className="customer-page-heading">
           <div>
             <p className="customer-eyebrow">Your salon history</p>
@@ -213,7 +234,7 @@ function AppointmentsPage() {
                 type="button"
               >
                 {option.label}
-                <span>{counts[option.value] ?? 0}</span>
+                <span className="ui-tabular">{counts[option.value] ?? 0}</span>
               </button>
             ))}
           </div>
@@ -237,11 +258,12 @@ function AppointmentsPage() {
               <span>Search service or reference</span>
               <input
                 type="search"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
+                name="appointment-search"
+                placeholder="e.g. Haircut or MERZ-…"
+                autoComplete="off"
+                spellCheck={false}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </label>
             <label className="customer-history-filter">
@@ -313,7 +335,7 @@ function AppointmentsPage() {
                 <span />
                 <span />
                 <span />
-                <p>Loading appointments...</p>
+                <p>Loading appointments…</p>
               </div>
             ) : items.length === 0 ? (
               <div className="customer-empty-state customer-history-empty">
@@ -380,33 +402,35 @@ function AppointmentsPage() {
                         View Details
                       </Link>
                       {appointment.canReschedule && (
-                        <Link
+                        <button
                           className="customer-button customer-button-outline"
-                          to={`/appointments/${appointment._id}/reschedule`}
+                          type="button"
+                          onClick={() => setRescheduling(appointment)}
                         >
                           Reschedule
-                        </Link>
+                        </button>
                       )}
                       {appointment.canCancel && (
                         <button
                           className="customer-button customer-button-outline"
                           type="button"
-                          disabled={pendingCancelId === appointment._id}
+                          aria-busy={pendingCancelId === appointment._id || undefined}
                           onClick={() => handleCancel(appointment)}
                         >
                           {pendingCancelId === appointment._id
-                            ? "Cancelling..."
+                            ? "Cancelling…"
                             : "Cancel"}
                         </button>
                       )}
                       {appointment.status === "completed" &&
                         !appointment.hasFeedback && (
-                          <Link
+                          <button
                             className="customer-button customer-button-primary"
-                            to={`/appointments/${appointment._id}`}
+                            type="button"
+                            onClick={() => setReviewing(appointment)}
                           >
                             Leave Feedback
-                          </Link>
+                          </button>
                         )}
                     </div>
                   </article>
@@ -443,6 +467,31 @@ function AppointmentsPage() {
           )}
         </section>
       </main>
+      {rescheduling && (
+        <RescheduleModal
+          appointment={rescheduling}
+          token={token}
+          onClose={() => setRescheduling(null)}
+          onRescheduled={() => {
+            setRescheduling(null);
+            setRetry((value) => value + 1);
+            toast.success("Your appointment has been moved to the new time.");
+          }}
+        />
+      )}
+      {reviewing && (
+        <FeedbackModal
+          appointment={reviewing}
+          token={token}
+          onClose={() => setReviewing(null)}
+          onSaved={() => {
+            setReviewing(null);
+            setRetry((value) => value + 1);
+            toast.success("Thank you! Your feedback was sent.");
+          }}
+        />
+      )}
+      {confirmDialog}
     </div>
   );
 }

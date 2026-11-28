@@ -7,9 +7,9 @@ import { cancelStaffAppointment } from "../services/bookingApi.js";
 import { formatPrice } from "../components/booking/bookingUtils.js";
 import { StatusBadge } from "../components/booking/BookingComponents.jsx";
 import StaffRescheduleDialog from "../components/booking/StaffRescheduleDialog.jsx";
-import Modal from "../components/admin/ui/Modal.jsx";
-import useConfirm from "../components/admin/ui/useConfirm.jsx";
-import { toast } from "../components/admin/ui/toast.js";
+import Modal from "../components/ui/Modal.jsx";
+import useConfirm from "../components/ui/useConfirm.jsx";
+import { toast } from "../components/ui/toast.js";
 import StaffNotificationBell from "../components/auth/StaffNotificationBell.jsx";
 import { getDashboardPath } from "../utils/accountRole.js";
 import "../styles/customer.css";
@@ -1252,7 +1252,7 @@ function AdminSchedulePage() {
           </Modal.Header>
           <Modal.Body>
             {hoursError && (
-              <p className="admin-note admin-note--error" role="alert">
+              <p className="ui-note ui-note--error" role="alert">
                 {hoursError}
               </p>
             )}
@@ -1267,7 +1267,7 @@ function AdminSchedulePage() {
                     className={`admin-schedule__hours-row${hours.enabled ? "" : " is-off"}`}
                     key={hours.weekday}
                   >
-                    <label className="admin-schedule__hours-day admin-check">
+                    <label className="admin-schedule__hours-day ui-check">
                       <input
                         type="checkbox"
                         checked={hours.enabled}
@@ -1336,7 +1336,7 @@ function AdminSchedulePage() {
             >
               {savingHours ? (
                 <>
-                  <span className="admin-spinner" aria-hidden="true" />
+                  <span className="ui-spinner" aria-hidden="true" />
                   Saving…
                 </>
               ) : (
